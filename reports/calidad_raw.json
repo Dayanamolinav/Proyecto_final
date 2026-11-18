@@ -1,0 +1,83 @@
+{
+  "etapa": "RAW",
+  "n_registros": 1212,
+  "n_columnas": 20,
+  "completitud": {
+    "proporcion_faltantes_por_columna": {
+      "fecha_diagnostico_confirmado": 1.0,
+      "ca125_u_ml": 0.1708,
+      "resultado_imagen": 0.1081,
+      "glucosa_mg_dl": 0.1007,
+      "presion_sistolica": 0.0858,
+      "imc": 0.0404,
+      "nombre": 0.0,
+      "id_paciente": 0.0,
+      "edad": 0.0,
+      "documento_identidad": 0.0,
+      "tabaquismo": 0.0,
+      "sexo": 0.0,
+      "paridad": 0.0,
+      "antecedente_familiar_cancer": 0.0,
+      "antecedente_personal_benigno": 0.0,
+      "fuente": 0.0,
+      "periodo": 0.0,
+      "riesgo_oncologico": 0.0,
+      "tratamiento_indicado": 0.0,
+      "comentario_oncologo": 0.0
+    },
+    "columnas_alta_ausencia": {
+      "fecha_diagnostico_confirmado": 1.0
+    },
+    "umbral_alta_ausencia": 0.4
+  },
+  "duplicados": {
+    "duplicados_exactos": 12,
+    "duplicados_por_id": 12
+  },
+  "validez": {
+    "edad_fuera_de_rango_0_120": 2,
+    "imc_fuera_de_rango_10_80": 0
+  },
+  "valores_extremos_iqr": {
+    "edad": {
+      "limite_inferior": 20.75,
+      "limite_superior": 88.35,
+      "n_outliers": 11
+    },
+    "imc": {
+      "limite_inferior": 13.6,
+      "limite_superior": 40.8,
+      "n_outliers": 3
+    },
+    "presion_sistolica": {
+      "limite_inferior": 82.5,
+      "limite_superior": 166.5,
+      "n_outliers": 5
+    },
+    "glucosa_mg_dl": {
+      "limite_inferior": 39.0,
+      "limite_superior": 159.0,
+      "n_outliers": 3
+    },
+    "paridad": {
+      "limite_inferior": -0.5,
+      "limite_superior": 3.5,
+      "n_outliers": 93
+    },
+    "ca125_u_ml": {
+      "limite_inferior": -4.3,
+      "limite_superior": 32.98,
+      "n_outliers": 47
+    }
+  },
+  "balance_clases": {
+    "conteo_clases": {
+      "0": 918,
+      "1": 294
+    },
+    "proporcion_clases": {
+      "0": 0.7574,
+      "1": 0.2426
+    }
+  }
+}

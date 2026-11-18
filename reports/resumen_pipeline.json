@@ -1,0 +1,141 @@
+{
+  "ingesta": {
+    "origen": "generador_sintetico_pruebas",
+    "es_sintetico": true,
+    "n_registros_iniciales": 1212,
+    "n_columnas": 20,
+    "columnas": [
+      "id_paciente",
+      "nombre",
+      "documento_identidad",
+      "edad",
+      "sexo",
+      "antecedente_familiar_cancer",
+      "antecedente_personal_benigno",
+      "tabaquismo",
+      "imc",
+      "presion_sistolica",
+      "glucosa_mg_dl",
+      "paridad",
+      "ca125_u_ml",
+      "resultado_imagen",
+      "fuente",
+      "periodo",
+      "riesgo_oncologico",
+      "fecha_diagnostico_confirmado",
+      "tratamiento_indicado",
+      "comentario_oncologo"
+    ]
+  },
+  "modelo_seleccionado": "logistic_regression",
+  "resultados_validacion_cruzada": {
+    "logistic_regression": {
+      "cv_mean": 0.6841396832915516,
+      "cv_std": 0.025949762433799286
+    },
+    "random_forest": {
+      "cv_mean": 0.6679066776725306,
+      "cv_std": 0.01832797588622801
+    },
+    "xgboost": {
+      "cv_mean": 0.6335845717479354,
+      "cv_std": 0.026746661265348564
+    }
+  },
+  "evaluacion_prueba_reservada": {
+    "modelo": {
+      "auroc": 0.6981,
+      "pr_auc": 0.4872,
+      "sensibilidad": 0.6034,
+      "especificidad": 0.6538,
+      "valor_predictivo_positivo": 0.3571,
+      "f1": 0.4487,
+      "brier_score": 0.216,
+      "umbral_usado": 0.5,
+      "n_verdaderos_positivos": 35.0,
+      "n_falsos_positivos": 63.0,
+      "n_verdaderos_negativos": 119.0,
+      "n_falsos_negativos": 23.0
+    },
+    "modelo_nulo": {
+      "auroc": 0.5,
+      "pr_auc": 0.2417,
+      "sensibilidad": 0.0,
+      "especificidad": 1.0,
+      "valor_predictivo_positivo": 0.0,
+      "f1": 0.0,
+      "brier_score": 0.1833,
+      "umbral_usado": 0.5,
+      "n_verdaderos_positivos": 0.0,
+      "n_falsos_positivos": 0.0,
+      "n_verdaderos_negativos": 182.0,
+      "n_falsos_negativos": 58.0
+    },
+    "supera_azar_auroc_mayor_0_50": true,
+    "brier_mejor_que_nulo": false
+  },
+  "variables_mas_influyentes": [
+    {
+      "variable": "cat__resultado_imagen_sospechoso",
+      "coeficiente (log-odds)": 0.996267308756535
+    },
+    {
+      "variable": "cat__resultado_imagen_normal",
+      "coeficiente (log-odds)": -0.7363958910791422
+    },
+    {
+      "variable": "cat__antecedente_personal_benigno_1",
+      "coeficiente (log-odds)": 0.5256593119040069
+    },
+    {
+      "variable": "cat__tabaquismo_activo",
+      "coeficiente (log-odds)": 0.4627527173405912
+    },
+    {
+      "variable": "cat__antecedente_familiar_cancer_1",
+      "coeficiente (log-odds)": 0.4030867005445262
+    },
+    {
+      "variable": "cat__grupo_etario_70+",
+      "coeficiente (log-odds)": 0.29756336431763
+    },
+    {
+      "variable": "cat__antecedente_personal_benigno_0",
+      "coeficiente (log-odds)": -0.2911691345393505
+    },
+    {
+      "variable": "cat__imc_categoria_obesidad",
+      "coeficiente (log-odds)": 0.28519357381550575
+    },
+    {
+      "variable": "num__ca125_u_ml",
+      "coeficiente (log-odds)": 0.24930295044594175
+    },
+    {
+      "variable": "num__edad",
+      "coeficiente (log-odds)": 0.2353250702433026
+    },
+    {
+      "variable": "cat__tabaquismo_nunca",
+      "coeficiente (log-odds)": -0.20977352936602492
+    },
+    {
+      "variable": "cat__antecedente_familiar_cancer_0",
+      "coeficiente (log-odds)": -0.16859652317992435
+    },
+    {
+      "variable": "num__presion_sistolica",
+      "coeficiente (log-odds)": -0.12733189622371785
+    },
+    {
+      "variable": "cat__sexo_F",
+      "coeficiente (log-odds)": 0.12568919607696008
+    },
+    {
+      "variable": "cat__grupo_etario_40-54",
+      "coeficiente (log-odds)": -0.12282570068947804
+    }
+  ],
+  "ruta_modelo": "C:\\Users\\USUARIO\\Downloads\\UN\\NOVENO\\PROYECTO FINAL\\prototipo\\oncorisk_prototype\\oncorisk_prototype\\models\\modelo_seleccionado.joblib",
+  "n_analytical": 1198
+}
