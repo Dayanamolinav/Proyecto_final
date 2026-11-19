@@ -1,5 +1,7 @@
 """Conexión segura a Snowflake mediante variables de entorno."""
 from __future__ import annotations
+from dotenv import load_dotenv
+load_dotenv()
 
 import os
 from contextlib import contextmanager

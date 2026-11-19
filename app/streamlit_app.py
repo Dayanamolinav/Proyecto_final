@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import base64
 import html
+import os
 import sys
 from pathlib import Path
 
@@ -14,6 +15,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from config import MODELS_DIR  # noqa: E402
 from src.modeling.explain import explain_model  # noqa: E402
 from src.processing.input_validation import prepare_patient_input  # noqa: E402
+from src.pipeline import run_full_pipeline  # noqa: E402
 from app.statistics_panel import render_statistics_panel, VARIABLE_LABELS, category  # noqa: E402
 
 APP_DIR = Path(__file__).resolve().parent
@@ -48,6 +50,67 @@ def load_model_bundle():
     if not MODEL_PATH.exists():
         return None
     return joblib.load(MODEL_PATH)
+
+
+def render_admin_panel():
+    with st.expander("⚙️ Panel de administración — actualizar el modelo", expanded=False):
+        codigo_esperado = os.getenv("ADMIN_PANEL_CODE", "")
+        if not codigo_esperado:
+            st.caption("No hay código configurado (ADMIN_PANEL_CODE en tu .env) — este panel queda abierto.")
+        else:
+            ingresado = st.text_input("Código de administrador", type="password", key="admin_code_input")
+            if ingresado != codigo_esperado:
+                if ingresado:
+                    st.error("Código incorrecto.")
+                else:
+                    st.caption("Ingresa el código de administrador para desbloquear esta sección.")
+                return
+
+        st.caption("Vuelve a entrenar el modelo sin usar la terminal.")
+        fuente = st.radio(
+            "Fuente de datos",
+            ["Snowflake (20.000 pacientes)", "Generar lote local pequeño"],
+            index=0,
+            key="admin_fuente",
+        )
+        password = ""
+        if fuente.startswith("Snowflake"):
+            password = st.text_input(
+                "Contraseña de Snowflake", type="password", key="admin_password",
+                help="No se guarda; solo se usa para esta actualización.",
+            )
+        if st.button("Entrenar / actualizar modelo", use_container_width=True, key="admin_entrenar"):
+            if fuente.startswith("Snowflake") and not password:
+                st.error("Ingresa la contraseña de Snowflake.")
+                return
+            if password:
+                os.environ["SNOWFLAKE_PASSWORD"] = password
+            with st.spinner("Entrenando modelo... puede tardar uno o dos minutos."):
+                try:
+                    summary = run_full_pipeline(
+                        backend="snowflake",
+                        use_snowflake_csv=fuente.startswith("Snowflake"),
+                    )
+                except Exception as exc:
+                    st.error(f"No se pudo entrenar: {exc}")
+                    return
+            load_model_bundle.clear()
+            ev = summary["evaluacion_prueba_reservada"]["modelo"]
+            st.success(
+                f"Modelo actualizado: {summary['modelo_seleccionado']} "
+                f"(AUROC {ev['auroc']:.3f})"
+            )
+            st.rerun()
+            
+def render_header():
+    logo = asset_uri("brand.svg", "image/svg+xml")
+    markup(f'''
+    <div id="inicio" class="section-anchor"></div>
+    <div class="utility-bar"><div class="utility-inner"><span>Investigación en salud · Universidad del Norte</span><span>Entorno académico &nbsp; / &nbsp; Datos sintéticos</span></div></div>
+    <header class="site-header">
+      <a class="brand" href="#inicio" target="_self" aria-label="OncoRisk, inicio"><img class="brand-mark" src="{logo}" alt=""/><span><span class="brand-name">Onco<span>Risk</span></span><span class="brand-tagline">INVESTIGACIÓN Y ANÁLISIS</span></span></a>
+      <nav class="nav-links" aria-label="Navegación principal"><a href="#inicio" target="_self">INICIO</a><a href="#proyecto" target="_self">EL PROYECTO</a><a href="#herramientas" target="_self">HERRAMIENTAS</a><a href="#modelo" target="_self">EL MODELO</a><a class="nav-cta" href="#explorar" target="_self">Iniciar exploración &nbsp; ↗</a></nav>
+    </header>''')
 
 
 def render_header():
@@ -222,6 +285,7 @@ def main():
         else:
             st.caption("La interpretación y las métricas estarán disponibles después de generar el modelo.")
     render_workflow()
+    render_admin_panel()
     render_footer()
 
 
