@@ -1,5 +1,23 @@
 {
   "etapa": "CLEAN",
+<<<<<<< HEAD
+  "n_registros": 1198,
+  "n_columnas": 15,
+  "completitud": {
+    "proporcion_faltantes_por_columna": {
+      "ca125_u_ml": 0.172,
+      "resultado_imagen": 0.1085,
+      "glucosa_mg_dl": 0.1018,
+      "presion_sistolica": 0.086,
+      "imc": 0.0409,
+      "edad": 0.0,
+      "id_paciente": 0.0,
+      "tabaquismo": 0.0,
+      "antecedente_personal_benigno": 0.0,
+      "antecedente_familiar_cancer": 0.0,
+      "sexo": 0.0,
+      "paridad": 0.0,
+=======
   "n_registros": 20000,
   "n_columnas": 15,
   "completitud": {
@@ -16,6 +34,7 @@
       "paridad": 0.0,
       "ca125_u_ml": 0.0,
       "resultado_imagen": 0.0,
+>>>>>>> 00e19cf546b21c5570e600468f7a8d417360b312
       "fuente": 0.0,
       "periodo": 0.0,
       "riesgo_oncologico": 0.0
@@ -33,6 +52,26 @@
   },
   "valores_extremos_iqr": {
     "edad": {
+<<<<<<< HEAD
+      "limite_inferior": 20.812,
+      "limite_superior": 88.312,
+      "n_outliers": 9
+    },
+    "imc": {
+      "limite_inferior": 13.6,
+      "limite_superior": 40.8,
+      "n_outliers": 3
+    },
+    "presion_sistolica": {
+      "limite_inferior": 82.5,
+      "limite_superior": 166.5,
+      "n_outliers": 5
+    },
+    "glucosa_mg_dl": {
+      "limite_inferior": 39.0,
+      "limite_superior": 159.0,
+      "n_outliers": 3
+=======
       "limite_inferior": 20.05,
       "limite_superior": 90.05,
       "n_outliers": 147
@@ -51,26 +90,45 @@
       "limite_inferior": 40.0,
       "limite_superior": 160.0,
       "n_outliers": 58
+>>>>>>> 00e19cf546b21c5570e600468f7a8d417360b312
     },
     "paridad": {
       "limite_inferior": -0.5,
       "limite_superior": 3.5,
+<<<<<<< HEAD
+      "n_outliers": 93
+    },
+    "ca125_u_ml": {
+      "limite_inferior": -4.239,
+      "limite_superior": 32.851,
+      "n_outliers": 46
+=======
       "n_outliers": 1548
     },
     "ca125_u_ml": {
       "limite_inferior": -4.265,
       "limite_superior": 32.815,
       "n_outliers": 784
+>>>>>>> 00e19cf546b21c5570e600468f7a8d417360b312
     }
   },
   "balance_clases": {
     "conteo_clases": {
+<<<<<<< HEAD
+      "0": 908,
+      "1": 290
+    },
+    "proporcion_clases": {
+      "0": 0.7579,
+      "1": 0.2421
+=======
       "0": 15012,
       "1": 4988
     },
     "proporcion_clases": {
       "0": 0.7506,
       "1": 0.2494
+>>>>>>> 00e19cf546b21c5570e600468f7a8d417360b312
     }
   }
 }

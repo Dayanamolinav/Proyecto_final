@@ -10,9 +10,12 @@ import joblib
 import pandas as pd
 import streamlit as st
 
+<<<<<<< HEAD
+=======
 import os
 from src.pipeline import run_full_pipeline  # noqa: E402
 
+>>>>>>> 00e19cf546b21c5570e600468f7a8d417360b312
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from config import MODELS_DIR  # noqa: E402
 from src.modeling.explain import explain_model  # noqa: E402
@@ -49,6 +52,9 @@ def load_model_bundle():
         return None
     return joblib.load(MODEL_PATH)
 
+<<<<<<< HEAD
+
+=======
 def render_admin_panel():
     with st.expander("⚙️ Panel de administración — actualizar el modelo", expanded=False):
         codigo_esperado = os.getenv("ADMIN_PANEL_CODE", "")
@@ -99,6 +105,7 @@ def render_admin_panel():
             )
             st.rerun()
             
+>>>>>>> 00e19cf546b21c5570e600468f7a8d417360b312
 def render_header():
     logo = asset_uri("brand.svg", "image/svg+xml")
     markup(f'''
@@ -254,7 +261,10 @@ def main():
         else:
             st.caption("La interpretación y las métricas estarán disponibles después de generar el modelo.")
     render_workflow()
+<<<<<<< HEAD
+=======
     render_admin_panel()
+>>>>>>> 00e19cf546b21c5570e600468f7a8d417360b312
     render_footer()
 
 

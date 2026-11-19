@@ -4,9 +4,14 @@ informe (Fig. 2): Ingesta -> RAW -> CLEAN -> ANALYTICAL -> EDA -> Modelado ->
 Evaluación -> Selección -> Prueba final reservada -> Persistencia del
 modelo para el prototipo (Streamlit).
 
+<<<<<<< HEAD
+Puede ejecutarse con un archivo CSV real (`csv_path`) cuando el hospital lo
+entregue, o sin argumentos para usar el conjunto sintético de prueba.
+=======
 Puede ejecutarse con el generador sintético local, con el lote de 20.000
 pacientes de prueba ya cargado en Snowflake (`use_snowflake_csv=True`), o
 con un archivo CSV real (deshabilitado hasta autorizarse).
+>>>>>>> 00e19cf546b21c5570e600468f7a8d417360b312
 """
 from __future__ import annotations
 
@@ -32,16 +37,25 @@ from src.processing.quality import build_quality_report, save_quality_report
 def run_full_pipeline(
     csv_path: str | Path | None = None,
     synth_cfg: SyntheticDataConfig | None = None,
+<<<<<<< HEAD
+=======
     backend: str | None = None,
     use_snowflake_csv: bool = True,
+>>>>>>> 00e19cf546b21c5570e600468f7a8d417360b312
 ) -> dict:
     """Ejecuta el flujo de punta a punta y devuelve un resumen con las
     rutas generadas y las métricas del modelo seleccionado."""
 
     # --- Fase: Ingesta -> RAW -------------------------------------------------
+<<<<<<< HEAD
+    df_source, ingest_meta = load_source_file(csv_path, synth_cfg)
+    persist_raw(df_source, filename="clinical_raw.parquet")
+    raw_df = read_layer("raw", "clinical_raw.parquet")
+=======
     df_source, ingest_meta = load_source_file(csv_path, synth_cfg, use_snowflake_csv=use_snowflake_csv)
     persist_raw(df_source, filename="clinical_raw.parquet", backend=backend)
     raw_df = read_layer("raw", "clinical_raw.parquet", backend=backend)
+>>>>>>> 00e19cf546b21c5570e600468f7a8d417360b312
 
     numeric_cols_for_quality = ["edad", "imc", "presion_sistolica", "glucosa_mg_dl", "paridad", "ca125_u_ml"]
     raw_quality = build_quality_report(raw_df, PATIENT_ID_COLUMN, numeric_cols_for_quality, stage_label="RAW")
@@ -49,14 +63,22 @@ def run_full_pipeline(
 
     # --- Fase: RAW -> CLEAN -----------------------------------------------------
     clean_df = run_cleaning_pipeline(raw_df)
+<<<<<<< HEAD
+    write_layer(clean_df, "clean", "clinical_clean.parquet")
+=======
     write_layer(clean_df, "clean", "clinical_clean.parquet", backend=backend)
+>>>>>>> 00e19cf546b21c5570e600468f7a8d417360b312
 
     clean_quality = build_quality_report(clean_df, PATIENT_ID_COLUMN, numeric_cols_for_quality, stage_label="CLEAN")
     save_quality_report(clean_quality, "calidad_clean.json")
 
     # --- Fase: CLEAN -> ANALYTICAL -----------------------------------------------
     analytical_df = build_analytical_table(clean_df)
+<<<<<<< HEAD
+    write_layer(analytical_df, "analytical", "clinical_analytical.parquet")
+=======
     write_layer(analytical_df, "analytical", "clinical_analytical.parquet", backend=backend)
+>>>>>>> 00e19cf546b21c5570e600468f7a8d417360b312
 
     # --- Fase: Modelado -----------------------------------------------------------
     split = make_train_test_split(analytical_df)
@@ -123,4 +145,8 @@ def run_full_pipeline(
 
 if __name__ == "__main__":
     result = run_full_pipeline()
+<<<<<<< HEAD
     print(json.dumps(result, ensure_ascii=False, indent=2, default=str))
+=======
+    print(json.dumps(result, ensure_ascii=False, indent=2, default=str))
+>>>>>>> 00e19cf546b21c5570e600468f7a8d417360b312

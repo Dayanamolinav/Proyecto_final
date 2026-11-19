@@ -1,11 +1,22 @@
 {
   "ingesta": {
+<<<<<<< HEAD
+    "origen": "generador_sintetico_pruebas",
+    "es_sintetico": true,
+    "n_registros_iniciales": 1212,
+    "n_columnas": 20,
+    "columnas": [
+      "id_paciente",
+      "nombre",
+      "documento_identidad",
+=======
     "origen": "snowflake_tabla_prueba:RAW.PACIENTES_PRUEBA_SINTETICOS",
     "es_sintetico": true,
     "n_registros_iniciales": 20000,
     "n_columnas": 15,
     "columnas": [
       "id_paciente",
+>>>>>>> 00e19cf546b21c5570e600468f7a8d417360b312
       "edad",
       "sexo",
       "antecedente_familiar_cancer",
@@ -19,12 +30,31 @@
       "resultado_imagen",
       "fuente",
       "periodo",
+<<<<<<< HEAD
+      "riesgo_oncologico",
+      "fecha_diagnostico_confirmado",
+      "tratamiento_indicado",
+      "comentario_oncologo"
+=======
       "riesgo_oncologico"
+>>>>>>> 00e19cf546b21c5570e600468f7a8d417360b312
     ]
   },
   "modelo_seleccionado": "logistic_regression",
   "resultados_validacion_cruzada": {
     "logistic_regression": {
+<<<<<<< HEAD
+      "cv_mean": 0.713704101024393,
+      "cv_std": 0.02034071427089535
+    },
+    "random_forest": {
+      "cv_mean": 0.7124437824806629,
+      "cv_std": 0.020630038040244866
+    },
+    "xgboost": {
+      "cv_mean": 0.689874667737539,
+      "cv_std": 0.019591336020036817
+=======
       "cv_mean": 0.7252621218972382,
       "cv_std": 0.0078235633657167
     },
@@ -35,10 +65,29 @@
     "xgboost": {
       "cv_mean": 0.7132343329961425,
       "cv_std": 0.010192454104073378
+>>>>>>> 00e19cf546b21c5570e600468f7a8d417360b312
     }
   },
   "evaluacion_prueba_reservada": {
     "modelo": {
+<<<<<<< HEAD
+      "auroc": 0.5864,
+      "pr_auc": 0.3682,
+      "sensibilidad": 0.4483,
+      "especificidad": 0.6538,
+      "valor_predictivo_positivo": 0.2921,
+      "f1": 0.3537,
+      "brier_score": 0.24,
+      "umbral_usado": 0.5,
+      "n_verdaderos_positivos": 26.0,
+      "n_falsos_positivos": 63.0,
+      "n_verdaderos_negativos": 119.0,
+      "n_falsos_negativos": 32.0
+    },
+    "modelo_nulo": {
+      "auroc": 0.5,
+      "pr_auc": 0.2417,
+=======
       "auroc": 0.7345,
       "pr_auc": 0.4966,
       "sensibilidad": 0.6433,
@@ -55,10 +104,44 @@
     "modelo_nulo": {
       "auroc": 0.5,
       "pr_auc": 0.2495,
+>>>>>>> 00e19cf546b21c5570e600468f7a8d417360b312
       "sensibilidad": 0.0,
       "especificidad": 1.0,
       "valor_predictivo_positivo": 0.0,
       "f1": 0.0,
+<<<<<<< HEAD
+      "brier_score": 0.1833,
+      "umbral_usado": 0.5,
+      "n_verdaderos_positivos": 0.0,
+      "n_falsos_positivos": 0.0,
+      "n_verdaderos_negativos": 182.0,
+      "n_falsos_negativos": 58.0
+    },
+    "curva_calibracion": {
+      "prob_predicha": [
+        0.2174,
+        0.2752,
+        0.309,
+        0.3424,
+        0.3988,
+        0.4571,
+        0.5125,
+        0.5841,
+        0.6841,
+        0.8216
+      ],
+      "prob_observada": [
+        0.2083,
+        0.2083,
+        0.2083,
+        0.1667,
+        0.2083,
+        0.2083,
+        0.2917,
+        0.125,
+        0.4167,
+        0.375
+=======
       "brier_score": 0.1872,
       "umbral_usado": 0.5,
       "n_verdaderos_positivos": 0.0,
@@ -90,6 +173,7 @@
         0.345,
         0.445,
         0.615
+>>>>>>> 00e19cf546b21c5570e600468f7a8d417360b312
       ]
     },
     "supera_azar_auroc_mayor_0_50": true,
@@ -98,6 +182,69 @@
   "variables_mas_influyentes": [
     {
       "variable": "cat__resultado_imagen_sospechoso",
+<<<<<<< HEAD
+      "coeficiente (log-odds)": 1.1053230279322555
+    },
+    {
+      "variable": "cat__resultado_imagen_normal",
+      "coeficiente (log-odds)": -0.709677488055643
+    },
+    {
+      "variable": "cat__tabaquismo_activo",
+      "coeficiente (log-odds)": 0.5389820202977056
+    },
+    {
+      "variable": "cat__antecedente_familiar_cancer_1",
+      "coeficiente (log-odds)": 0.49649650480380203
+    },
+    {
+      "variable": "cat__antecedente_personal_benigno_1",
+      "coeficiente (log-odds)": 0.40865967295671124
+    },
+    {
+      "variable": "cat__grupo_etario_70+",
+      "coeficiente (log-odds)": 0.3543151591239631
+    },
+    {
+      "variable": "cat__antecedente_familiar_cancer_0",
+      "coeficiente (log-odds)": -0.28840015662549434
+    },
+    {
+      "variable": "cat__imc_categoria_obesidad",
+      "coeficiente (log-odds)": 0.2640686262766557
+    },
+    {
+      "variable": "cat__imc_categoria_bajo_peso",
+      "coeficiente (log-odds)": -0.24499324687146068
+    },
+    {
+      "variable": "cat__sexo_F",
+      "coeficiente (log-odds)": 0.23978620675805837
+    },
+    {
+      "variable": "num__edad",
+      "coeficiente (log-odds)": 0.2382190175499993
+    },
+    {
+      "variable": "cat__tabaquismo_nunca",
+      "coeficiente (log-odds)": -0.23466109131020332
+    },
+    {
+      "variable": "cat__antecedente_personal_benigno_0",
+      "coeficiente (log-odds)": -0.2005633247784801
+    },
+    {
+      "variable": "num__ca125_u_ml",
+      "coeficiente (log-odds)": 0.19737676691353073
+    },
+    {
+      "variable": "cat__resultado_imagen_indeterminado",
+      "coeficiente (log-odds)": -0.18754919169829173
+    }
+  ],
+  "ruta_modelo": "models/modelo_seleccionado.joblib",
+  "n_analytical": 1198
+=======
       "coeficiente (log-odds)": 1.0890304017536812
     },
     {
@@ -159,4 +306,5 @@
   ],
   "ruta_modelo": "models\\modelo_seleccionado.joblib",
   "n_analytical": 20000
+>>>>>>> 00e19cf546b21c5570e600468f7a8d417360b312
 }
