@@ -8,7 +8,7 @@ La fuente del panel es `data/synthetic/pacientes_sinteticos_20000.csv`, incluida
 
 SHA256: `bf2078859176c2292618f8688944f8d14b2ab4688754c3bdd5ac87e4b2bc652a`.
 
-Se comprobó de forma independiente: 4.988 etiquetas 1 / 20.000 = 24,94%; Wilson95% [24,3452175894%; 25,5444072577%]. Edad media 55,076595 años y mediana 55 años. Hay 3.567 registros con sexo M y paridad > 0, producto de la simulación independiente de campos; se señalan para revisión y se conservan. Estos resultados no describen una población hospitalaria.
+Cifras de referencia de la base: 4.988 etiquetas 1 / 20.000 = 24,94%; Wilson95% [24,3452175894%; 25,5444072577%]. Edad media 55,076595 años y mediana 55 años. Hay 3.567 registros con sexo M y paridad > 0, producto de la simulación independiente de campos; se señalan para revisión y se conservan. Estos resultados no describen una población hospitalaria.
 
 ## Cobertura
 
@@ -37,7 +37,7 @@ Los cuatro semestres no son consultas fechadas: cada paciente tiene una observac
 
 ## Población del modelo
 
-El modelo individual conserva su archivo y entrenamiento previo. Su evaluación utiliza una fuente diferente: la partición reservada de 240 pacientes de `data/analytical/clinical_analytical.parquet`. Se reconstruye con la misma semilla y estratificación agrupada por paciente, cotejando AUROC y las cuatro celdas de la matriz contra la evaluación persistida. No se vuelve a ajustar ni seleccionar ningún modelo. Si no coincide, se muestra un error en lugar de adjudicarle una prueba falsa.
+Desde la versión del 17 de noviembre de 2026, el modelo se entrena con este mismo lote de 20.000 pacientes. Su evaluación utiliza la partición reservada de 4.000 pacientes de `data/analytical/clinical_analytical.parquet`. Se reconstruye con la misma semilla y estratificación agrupada por paciente, cotejando AUROC y las cuatro celdas de la matriz (con el umbral guardado junto al modelo, 0,25) contra la evaluación persistida. No se vuelve a ajustar ni seleccionar ningún modelo. Si no coincide, se muestra un error en lugar de adjudicarle una prueba falsa. El control deslizante del umbral parte del valor elegido en desarrollo y solo sirve para explorar.
 
 Los filtros del CSV no modifican esa prueba independiente del panel de cohortes; la interfaz indica esta excepción. El umbral es exploratorio: no se optimiza con la prueba ni se propone para decisiones clínicas. Los IC95% del modelo usan bootstrap percentil estratificado, 500 réplicas y semilla 42. Son condicionales al modelo fijo y la proporción de clases observada; no incluyen incertidumbre de entrenamiento ni son validación externa. Las métricas sin denominador se muestran como no definidas.
 
@@ -52,12 +52,6 @@ python -m streamlit run app/streamlit_app.py
 ```
 
 Las funciones reproducibles están en `src/analytics/`; la interfaz está en `app/statistics_panel.py`. No se cambiaron las capas de entrenamiento ni almacenamiento del prototipo. Se añadieron pruebas de resultados conocidos, fórmulas, estados límite y filtros.
-
-## Referencias de implementación
-
-## Verificación de esta entrega
-
-Pasaron 32 pruebas automatizadas. Se verificó además cada vista del panel en navegador de escritorio y una vista representativa a 390 px, sin desbordamiento horizontal. Se revisaron marcas de las gráficas, etiquetas, intervalos y los estados de calidad. La exportación de la selección femenina se leyó de nuevo: 15.583 filas, 15.583 IDs únicos y únicamente sexo F. Restablecer devolvió los 20.000 registros y el control de consistencia de 3.567 casos. Los 19 módulos previos de `src/` y el modelo persistido permanecen idénticos por SHA256 a la versión anterior. Las referencias técnicas de los métodos se listan a continuación.
 
 ## Documentación técnica
 

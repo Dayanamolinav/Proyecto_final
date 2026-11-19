@@ -63,6 +63,6 @@ def load_patient_data(path: str | Path | None = None) -> tuple[pd.DataFrame, dic
         "independent_ids": bool(frame["id_paciente"].notna().all() and not frame["id_paciente"].duplicated().any()),
         "periods": sorted(frame["periodo"].dropna().unique().tolist()),
         "time_scope": "Semestres de procedencia simulados; no fechas de seguimiento",
-        "training_scope": "El panel describe este CSV. El modelo individual conserva su entrenamiento previo en otra base sintética.",
+        "training_scope": "El panel describe este CSV, que también es la fuente con la que se entrena el modelo (20% reservado como prueba).",
     }
     return data, metadata

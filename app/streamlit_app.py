@@ -1,7 +1,6 @@
-"""Portal académico OncoRisk. Presentación institucional y modelo sintético."""
+"""Portal académico OncoRisk. Portada editorial con videos y modelo sintético."""
 from __future__ import annotations
 
-import base64
 import html
 import os
 import sys
@@ -12,7 +11,7 @@ import pandas as pd
 import streamlit as st
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from config import MODELS_DIR  # noqa: E402
+from config import MODELS_DIR, TEST_SIZE  # noqa: E402
 from src.modeling.explain import explain_model  # noqa: E402
 from src.processing.input_validation import prepare_patient_input  # noqa: E402
 from src.pipeline import run_full_pipeline  # noqa: E402
@@ -20,29 +19,24 @@ from app.statistics_panel import render_statistics_panel, VARIABLE_LABELS, categ
 
 APP_DIR = Path(__file__).resolve().parent
 MODEL_PATH = MODELS_DIR / "modelo_seleccionado.joblib"
+MEDIA = "app/static/media"  # servido por Streamlit (server.enableStaticServing)
 MODEL_NAMES = {"logistic_regression": "Regresión logística", "random_forest": "Random Forest", "xgboost": "XGBoost"}
-st.set_page_config(page_title="OncoRisk | Investigación y análisis oncológico", page_icon="◈", layout="wide")
+st.set_page_config(page_title="OncoRisk | Investigación y análisis oncológico", page_icon=":material/biotech:", layout="wide")
 
 
-def asset_uri(name: str, mime: str) -> str:
-    data = (APP_DIR / "assets" / name).read_bytes()
-    return f"data:{mime};base64,{base64.b64encode(data).decode('ascii')}"
+def section(content: str):
+    """Inserta una sección de la portada (HTML propio, sin JavaScript)."""
+    st.html(f'<div class="or">{content}</div>')
 
 
-def markup(content: str):
-    if st.query_params.get("vista") == "estadisticas":
-        content = content.replace('href="#', 'href="?#')
-    st.markdown(content, unsafe_allow_html=True)
+def video(name: str, extra: str = "") -> str:
+    return (f'<video {extra} autoplay muted loop playsinline preload="auto" poster="{MEDIA}/{name}_poster.jpg">'
+            f'<source src="{MEDIA}/{name}.mp4" type="video/mp4"></video>')
 
 
-def icon(name: str) -> str:
-    paths = {
-        "profile": '<circle cx="24" cy="16" r="7"/><path d="M10 40v-4a14 14 0 0 1 28 0v4M18 36h12M24 30v12"/>',
-        "chart": '<path d="M8 8v32h34M16 30l8-10 8 5 10-15M16 38v-5M26 38v-9M36 38V22"/>',
-        "research": '<path d="M19 7h10M22 7v13L10 37a4 4 0 0 0 3 6h22a4 4 0 0 0 3-6L26 20V7M16 30h16M21 35h.1M28 38h.1"/>',
-        "shield": '<path d="M24 5 8 12v12c0 10 16 19 16 19s16-9 16-19V12ZM16 24l6 6 11-12"/>',
-    }
-    return f'<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{paths[name]}</svg>'
+def num(value: float, decimals: int = 0) -> str:
+    text = f"{value:,.{decimals}f}"
+    return text.replace(",", "X").replace(".", ",").replace("X", ".")
 
 
 @st.cache_resource(show_spinner=False)
@@ -52,124 +46,198 @@ def load_model_bundle():
     return joblib.load(MODEL_PATH)
 
 
-def render_admin_panel():
-    with st.expander("⚙️ Panel de administración — actualizar el modelo", expanded=False):
-        codigo_esperado = os.getenv("ADMIN_PANEL_CODE", "")
-        if not codigo_esperado:
-            st.caption("No hay código configurado (ADMIN_PANEL_CODE en tu .env) — este panel queda abierto.")
-        else:
-            ingresado = st.text_input("Código de administrador", type="password", key="admin_code_input")
-            if ingresado != codigo_esperado:
-                if ingresado:
-                    st.error("Código incorrecto.")
-                else:
-                    st.caption("Ingresa el código de administrador para desbloquear esta sección.")
-                return
+# --------------------------------------------------------------------------- portada
 
-        st.caption("Vuelve a entrenar el modelo sin usar la terminal.")
-        fuente = st.radio(
-            "Fuente de datos",
-            ["Snowflake (20.000 pacientes)", "Generar lote local pequeño"],
-            index=0,
-            key="admin_fuente",
-        )
-        password = ""
-        if fuente.startswith("Snowflake"):
-            password = st.text_input(
-                "Contraseña de Snowflake", type="password", key="admin_password",
-                help="No se guarda; solo se usa para esta actualización.",
-            )
-        if st.button("Entrenar / actualizar modelo", use_container_width=True, key="admin_entrenar"):
-            if fuente.startswith("Snowflake") and not password:
-                st.error("Ingresa la contraseña de Snowflake.")
-                return
-            if password:
-                os.environ["SNOWFLAKE_PASSWORD"] = password
-            with st.spinner("Entrenando modelo... puede tardar uno o dos minutos."):
-                try:
-                    summary = run_full_pipeline(
-                        backend="snowflake",
-                        use_snowflake_csv=fuente.startswith("Snowflake"),
-                    )
-                except Exception as exc:
-                    st.error(f"No se pudo entrenar: {exc}")
-                    return
-            load_model_bundle.clear()
-            ev = summary["evaluacion_prueba_reservada"]["modelo"]
-            st.success(
-                f"Modelo actualizado: {summary['modelo_seleccionado']} "
-                f"(AUROC {ev['auroc']:.3f})"
-            )
-            st.rerun()
-            
-def render_header():
-    logo = asset_uri("brand.svg", "image/svg+xml")
-    markup(f'''
-    <div id="inicio" class="section-anchor"></div>
-    <div class="utility-bar"><div class="utility-inner"><span>Investigación en salud · Universidad del Norte</span><span>Entorno académico &nbsp; / &nbsp; Datos sintéticos</span></div></div>
-    <header class="site-header">
-      <a class="brand" href="#inicio" target="_self" aria-label="OncoRisk, inicio"><img class="brand-mark" src="{logo}" alt=""/><span><span class="brand-name">Onco<span>Risk</span></span><span class="brand-tagline">INVESTIGACIÓN Y ANÁLISIS</span></span></a>
-      <nav class="nav-links" aria-label="Navegación principal"><a href="#inicio" target="_self">INICIO</a><a href="#proyecto" target="_self">EL PROYECTO</a><a href="#herramientas" target="_self">HERRAMIENTAS</a><a href="#modelo" target="_self">EL MODELO</a><a class="nav-cta" href="#explorar" target="_self">Iniciar exploración &nbsp; ↗</a></nav>
-    </header>''')
-
-
-def render_header():
-    logo = asset_uri("brand.svg", "image/svg+xml")
-    markup(f'''
-    <div id="inicio" class="section-anchor"></div>
-    <div class="utility-bar"><div class="utility-inner"><span>Investigación en salud · Universidad del Norte</span><span>Entorno académico &nbsp; / &nbsp; Datos sintéticos</span></div></div>
-    <header class="site-header">
-      <a class="brand" href="#inicio" target="_self" aria-label="OncoRisk, inicio"><img class="brand-mark" src="{logo}" alt=""/><span><span class="brand-name">Onco<span>Risk</span></span><span class="brand-tagline">INVESTIGACIÓN Y ANÁLISIS</span></span></a>
-      <nav class="nav-links" aria-label="Navegación principal"><a href="?#inicio" target="_self">INICIO</a><a href="?#proyecto" target="_self">EL PROYECTO</a><a href="?#herramientas" target="_self">HERRAMIENTAS</a><a href="?vista=estadisticas" target="_self">ANÁLISIS ESTADÍSTICO</a><a class="nav-cta" href="?#explorar" target="_self">Exploración individual &nbsp; ↗</a></nav>
+def render_header(solid: bool):
+    home = "?" if solid else ""
+    section(f'''
+    <header class="or-header{' solid' if solid else ''}" id="or-header">
+      <a class="logo" href="{home}#inicio" target="_self">OncoRisk</a>
+      <nav aria-label="Secciones">
+        <a href="{home}#proyecto" target="_self">Proyecto</a><a href="{home}#metodo" target="_self">Método</a>
+        <a href="{home}#explorar" target="_self">Explorar</a><a href="?vista=estadisticas" target="_self">Análisis estadístico</a>
+      </nav>
     </header>''')
 
 
 def render_hero():
-    photo = asset_uri("equipo-investigacion.png", "image/png")
-    markup(f'''
-    <section class="hero" aria-labelledby="hero-title">
-      <div class="hero-content"><span class="hero-kicker">CONOCIMIENTO QUE CONECTA</span><h1 id="hero-title" class="hero-title">La investigación<br>empieza con<br><em>una nueva mirada.</em></h1><p class="hero-copy">Exploramos características asociadas al riesgo oncológico a través de los datos y el aprendizaje automático.</p><div class="hero-actions"><a class="button-link" href="#explorar" target="_self">Explorar el modelo &nbsp; →</a><a class="button-link secondary" href="#proyecto" target="_self">Conoce el proyecto</a></div><div class="hero-label">PROTOTIPO ACADÉMICO &nbsp; · &nbsp; DATOS SINTÉTICOS</div></div>
-      <div class="hero-picture"><img src="{photo}" alt="Ilustración generada con IA de un equipo de investigación en salud"/><span class="hero-stat">Datos que inspiran<br><strong>nuevas preguntas.</strong></span><small class="image-credit">Imagen ilustrativa generada con IA</small></div>
+    section(f'''
+    <section class="or-hero" id="inicio">
+      {video("v13_celulas", 'id="or-hero-video"')}
+      <div class="or-hero-in">
+        <h1 class="or-d" aria-label="OncoRisk"><span class="ch">Onco</span><span class="ch" style="animation-delay:.12s">Risk</span></h1>
+        <div class="or-hero-meta">
+          <div><b>Universidad del Norte</b>Ingeniería de Sistemas</div>
+          <div><b>Ingeniería de datos</b>Snowflake · SQL · Python</div>
+          <div><b>Aprendizaje automático</b>Tres modelos comparados</div>
+          <div><b>Prototipo académico</b>Datos sintéticos</div>
+        </div>
+      </div>
     </section>''')
 
 
-def render_services():
-    cards = [
-        ("profile", "Exploración individual", "Configura las variables de un caso de ejemplo y consulta la estimación del modelo sintético.", "explorar", "Explorar variables"),
-        ("chart", "Análisis estadístico", "Explora distribuciones, comparaciones, correlaciones y estimaciones de los 20.000 pacientes sintéticos.", "?vista=estadisticas", "Abrir panel estadístico"),
-        ("research", "Investigación transparente", "Revisa las variables del modelo y sus métricas de evaluación en la prueba sintética.", "modelo", "Conocer el modelo"),
+def render_statement():
+    section('''
+    <section class="or-statement" id="proyecto">
+      <p id="or-manifiesto">Integramos, limpiamos y analizamos <span class="hl">20.000 registros clínicos</span> para identificar qué
+      características se asocian con un mayor <span class="hl">riesgo oncológico</span>, y dejamos rastro de cada paso.</p>
+    </section>''')
+
+
+def render_facts(bundle: dict | None):
+    if bundle is not None:
+        ev, null = bundle["evaluation"]["modelo"], bundle["evaluation"]["modelo_nulo"]
+        n_test = int(ev["n_verdaderos_positivos"] + ev["n_falsos_positivos"] + ev["n_verdaderos_negativos"] + ev["n_falsos_negativos"])
+        n_total = round(n_test / TEST_SIZE)
+        facts = [
+            (num(n_total), f'data-count="{n_total}" data-sep="1"', "pacientes sintéticos en la base analítica"),
+            (num(ev["auroc"], 3), f'data-count="{ev["auroc"]}" data-dec="3"', f"AUROC en la prueba reservada de {num(n_test)} pacientes"),
+            (num(ev["brier_score"], 3), f'data-count="{ev["brier_score"]}" data-dec="3"', f"Brier del modelo, frente a {num(null['brier_score'], 3)} del modelo nulo"),
+            (num(ev["sensibilidad"] * 100) + "%", f'data-count="{round(ev["sensibilidad"] * 100)}" data-suf="%"', f"sensibilidad con el umbral técnico de {num(bundle.get('threshold', .5), 2)}"),
+        ]
+    else:
+        facts = [("—", "", "Genera el modelo para ver sus cifras")]
+    rows = "".join(f'<div class="or-fact rv"><b {attrs}>{value}</b><span>{html.escape(label)}</span></div>' for value, attrs, label in facts)
+    section(f'''
+    <section class="or-split">
+      <div class="photo"><img src="{MEDIA}/f23_cientifica.jpg" alt="Investigadora observando una muestra en el microscopio"></div>
+      <div class="or-facts"><h2 class="or-d rv">El modelo, en cifras</h2>{rows}</div>
+    </section>''')
+
+
+def render_wide():
+    section(f'''
+    <section class="or-wide" id="or-wide">
+      {video("v7_microscopios", 'id="or-parallax"')}
+      <div class="or-wide-in">
+        <h2 class="or-d rv">Investigación con trazabilidad</h2>
+        <p class="rv">Cada registro conserva su procedencia: desde que entra a Snowflake hasta que el modelo emite una estimación.</p>
+      </div>
+    </section>
+    <div class="or-marquee" aria-hidden="true"><div>{"Ingesta<i>/</i>RAW<i>/</i>CLEAN<i>/</i>ANALYTICAL<i>/</i>Modelado<i>/</i>Evaluación<i>/</i>" * 2}</div></div>''')
+
+
+def render_method():
+    steps = [
+        ("01 · Ingesta", "El dato entra con su historia", "El CSV se sube a un Stage de Snowflake y se carga con <code>COPY INTO</code>. Cada carga queda registrada con su archivo, sus filas y su fecha."),
+        ("02 · Transformación", "Reglas claras, sin atajos", "SQL construye las capas CLEAN y ANALYTICAL: quita duplicados, valores imposibles y variables posteriores al diagnóstico. La bitácora guarda cada regla."),
+        ("03 · Modelado", "Tres modelos, una comparación justa", "Regresión logística, Random Forest y XGBoost con validación cruzada agrupada por paciente. El umbral se elige solo con datos de desarrollo."),
+        ("04 · Evaluación", "Una sola prueba, sin repetir", "El modelo elegido se evalúa una vez en los pacientes reservados: discriminación, calibración y clasificación."),
     ]
-    rendered = "".join(f'<article class="service-card"><span class="service-icon">{icon(i)}</span><h3>{title}</h3><p>{copy}</p><a href="{anchor if anchor.startswith(chr(63)) else chr(35)+anchor}" target="_self">{label} &nbsp; →</a></article>' for i, title, copy, anchor, label in cards)
-    markup(f'<section id="herramientas" class="content-width section-anchor"><div class="section-heading"><span class="eyebrow">UN ESPACIO PARA EXPLORAR</span><h2>La información, más cerca de ti</h2><p>Tres formas de acercarte al análisis y comprender cada paso.</p></div><div class="service-grid">{rendered}</div></section>')
+    articles = "".join(f'<article class="or-step{" on" if i == 0 else ""}" data-i="{i}"><span class="or-label">{lab}</span><h3 class="or-d">{title}</h3><p>{body}</p></article>'
+                       for i, (lab, title, body) in enumerate(steps))
+    section(f'''
+    <section class="or-method" id="metodo">
+      <div class="media" aria-hidden="true">
+        {video("v2_tubo", 'class="on"')}
+        <img src="{MEDIA}/f27_microscopio.jpg" alt="">
+        {video("v17_medica")}
+        <img src="{MEDIA}/f23_cientifica.jpg" alt="">
+        <span class="idx" id="or-idx">01</span>
+      </div>
+      <div class="or-steps">{articles}</div>
+    </section>''')
 
 
-def render_project():
-    markup(f'''
-    <section id="proyecto" class="info-band section-anchor"><div class="content-width info-inner"><div class="info-copy"><span class="eyebrow">NUESTRO PROPÓSITO</span><h2>Transformar los datos<br>en conocimiento.</h2><p>OncoRisk es un proyecto académico de ingeniería de datos y aprendizaje automático. Integra preparación de datos, comparación de modelos y una interfaz para explorar sus resultados.</p><p>Esta demostración trabaja con información sintética y permite estudiar el comportamiento del modelo seleccionado.</p><a href="#metodologia" target="_self" class="text-link">Conoce cómo funciona &nbsp; →</a></div><div class="info-art"><div class="purpose-symbol">{icon("shield")}</div><h3>Una exploración responsable</h3><p>Los datos y el modelo son sintéticos. Las estimaciones son experimentales y no deben usarse para diagnóstico ni decisiones clínicas.</p><div class="purpose-tags"><span>Datos sintéticos</span><span>Validación interna</span><span>Uso académico</span></div></div></div></section>''')
+def render_close():
+    section(f'''
+    <section class="or-close">
+      {video("v17_medica")}
+      <div class="or-close-in">
+        <h2 class="or-d rv">Los datos también cuentan</h2>
+        <p class="rv">Ocho vistas de análisis estadístico: demografía, distribuciones, correlaciones, contrastes, evolución por semestre, PCA y evaluación del modelo.</p>
+        <a class="or-link rv" href="?vista=estadisticas" target="_self">Abrir el análisis estadístico <span>→</span></a>
+      </div>
+    </section>''')
 
+
+def render_footer():
+    home = "?" if st.query_params.get("vista") == "estadisticas" else ""
+    section(f'''
+    <footer class="or-footer">
+      <div class="logo">OncoRisk</div>
+      <div>Prototipo académico de ingeniería de datos e inteligencia artificial. Datos sintéticos, validación interna, uso experimental. No emite diagnósticos.</div>
+      <div>Explorar<a href="{home}#proyecto" target="_self">Proyecto</a><a href="{home}#metodo" target="_self">Método</a><a href="{home}#explorar" target="_self">Explorar un caso</a><a href="?vista=estadisticas" target="_self">Análisis estadístico</a></div>
+      <div>Universidad del Norte<br>Barranquilla, Colombia<br><br>Videos y fotos: Pexels</div>
+    </footer>''')
+
+
+def render_motion_script():
+    """Efectos de desplazamiento: aparición, cifras, manifiesto, método fijo y parallax."""
+    # Nota: DOMPurify descarta un <script> si su texto contiene etiquetas HTML;
+    # por eso el script arma los elementos con la API del DOM y no con cadenas HTML.
+    st.html('''<div class="or-motion" hidden></div>
+<script>
+(() => {
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const $ = (s, r = document) => r.querySelector(s), $$ = (s, r = document) => [...r.querySelectorAll(s)];
+  document.querySelectorAll('.or video').forEach(v => { v.muted = true; const p = v.play(); if (p) p.catch(() => {}); });
+
+  const man = $('#or-manifiesto');
+  if (man && !man.dataset.split) {
+    man.dataset.split = '1';
+    const frag = document.createDocumentFragment();
+    const addWords = (text, hl) => text.split(/(\\s+)/).forEach(part => {
+      if (!part) return;
+      if (/^\\s+$/.test(part)) { frag.appendChild(document.createTextNode(' ')); return; }
+      const s = document.createElement('span'); s.className = hl ? 'w hl' : 'w'; s.textContent = part; frag.appendChild(s);
+    });
+    [...man.childNodes].forEach(n => addWords(n.textContent, n.nodeType === 1 && n.classList.contains('hl')));
+    man.replaceChildren(frag);
+  }
+
+  const fmt = (v, dec, sep) => { let s = dec ? v.toFixed(dec).replace('.', ',') : Math.round(v).toString(); return sep ? s.replace(/\\B(?=(\\d{3})+(?!\\d))/g, '.') : s; };
+  const count = el => { if (el.dataset.done) return; el.dataset.done = 1; const end = +el.dataset.count, dec = +el.dataset.dec || 0, sep = el.dataset.sep, suf = el.dataset.suf || '';
+    if (reduce) { el.textContent = fmt(end, dec, sep) + suf; return; } const t0 = performance.now();
+    (function f(t) { const k = Math.min(1, (t - t0) / 1600), e = 1 - Math.pow(1 - k, 4); el.textContent = fmt(end * e, dec, sep) + suf; if (k < 1) requestAnimationFrame(f); })(t0); };
+  const io = new IntersectionObserver(es => es.forEach(e => { if (!e.isIntersecting) return; const n = e.target; n.classList.add('in');
+    n.querySelectorAll('[data-count]').forEach(count); io.unobserve(n); }), { threshold: .25 });
+  $$('.or .rv, .or-split .photo').forEach(el => io.observe(el));
+
+  const media = $$('.or-method .media > video, .or-method .media > img'), idx = $('#or-idx');
+  const stepIo = new IntersectionObserver(es => es.forEach(e => { if (!e.isIntersecting) return; const i = +e.target.dataset.i;
+    $$('.or-step').forEach(s => s.classList.toggle('on', s === e.target)); media.forEach((m, j) => m.classList.toggle('on', j === i));
+    if (idx) idx.textContent = String(i + 1).padStart(2, '0'); }), { rootMargin: '-45% 0px -45% 0px' });
+  $$('.or-step').forEach(s => stepIo.observe(s));
+
+  const head = $('#or-header'), hero = $('#or-hero-video'), par = $('#or-parallax'), wide = $('#or-wide');
+  const dark = $$('.or-hero, .or-wide, .or-close');
+  const words = man ? $$('.w', man) : [];
+  function tick() {
+    const h = innerHeight;
+    if (hero && !reduce) { const r = hero.parentElement.getBoundingClientRect(), y = Math.max(0, -r.top); hero.style.transform = `scale(${1.08 + y / h * .12}) translateY(${y * .25}px)`; }
+    if (par && wide && !reduce) { const r = wide.getBoundingClientRect(); par.style.transform = `translateY(${(r.top / h) * -9}%)`; }
+    if (man) { const r = man.getBoundingClientRect(), p = Math.min(1, Math.max(0, (h * .85 - r.top) / (r.height + h * .35))), lit = Math.round(p * words.length);
+      words.forEach((w, i) => w.classList.toggle('on', i < lit)); }
+    if (head && !head.dataset.fixedSolid) head.classList.toggle('solid', !dark.some(s => { const r = s.getBoundingClientRect(); return r.top <= 40 && r.bottom > 40; }));
+  }
+  if (head && head.classList.contains('solid') && !dark.length) head.dataset.fixedSolid = 1;
+  if (!window.__orTick) { window.__orTick = true; document.addEventListener('scroll', () => requestAnimationFrame(() => window.__orRun && window.__orRun()), { capture: true, passive: true }); }
+  window.__orRun = tick; tick();
+})();
+</script>''', unsafe_allow_javascript=True)
+
+
+# --------------------------------------------------------------------------- herramientas
 
 def patient_input_form() -> pd.DataFrame | None:
-    with st.form("formulario_paciente"):
-        col1, col2, col3 = st.columns(3, gap="large")
+    with st.form("formulario_paciente", border=False):
+        col1, col2, col3 = st.columns(3, gap="medium")
         with col1:
-            st.markdown("#### Perfil general")
             edad = st.number_input("Edad (años)", min_value=18, max_value=100, value=55)
             sexo = st.selectbox("Sexo", ["F", "M"])
             imc = st.number_input("IMC (kg/m²)", min_value=12.0, max_value=60.0, value=26.5, step=0.1)
             tabaquismo = st.selectbox("Tabaquismo", ["nunca", "exfumador", "activo"])
         with col2:
-            st.markdown("#### Antecedentes y hábitos")
             antecedente_familiar = st.selectbox("Antecedente familiar de cáncer", ["No", "Sí"])
             antecedente_personal = st.selectbox("Antecedente personal benigno relevante", ["No", "Sí"])
             presion_sistolica = st.number_input("Presión sistólica (mmHg)", min_value=80, max_value=220, value=125)
             glucosa = st.number_input("Glucosa (mg/dL)", min_value=50, max_value=350, value=98)
         with col3:
-            st.markdown("#### Información complementaria")
             paridad = st.number_input("Paridad (número de embarazos)", min_value=0, max_value=10, value=1)
             ca125 = st.number_input("CA-125 (U/mL)", min_value=0.0, max_value=600.0, value=18.0, step=0.1)
             resultado_imagen = st.selectbox("Hallazgo de imagen", ["normal", "indeterminado", "sospechoso"])
-            st.caption("Variables de ejemplo para la demostración sintética.")
-        submitted = st.form_submit_button("Calcular estimación →", type="primary", use_container_width=True)
+        submitted = st.form_submit_button("Calcular estimación →", width="stretch")
     if not submitted:
         return None
     row = {"edad": edad, "imc": imc, "presion_sistolica": presion_sistolica, "glucosa_mg_dl": glucosa,
@@ -186,17 +254,41 @@ def patient_input_form() -> pd.DataFrame | None:
 
 
 def render_prediction(bundle: dict, patient_df: pd.DataFrame):
-    pipeline = bundle["pipeline"]
-    proba = float(pipeline.predict_proba(patient_df[bundle["feature_columns"]])[0, 1])
-    st.caption("Corresponde a los valores enviados en el último cálculo. Para actualizarlo, vuelve a pulsar Calcular estimación.")
-    left, right = st.columns([1, 2], gap="large")
-    with left:
-        st.metric("Probabilidad estimada", f"{proba:.1%}")
-        st.progress(min(max(proba, 0.0), 1.0))
-    with right:
-        markup('<div class="panel result-card"><h3>¿Cómo leer este resultado?</h3><p>Es una probabilidad de clasificación de una condición simulada. No representa el riesgo futuro de una persona y no se han establecido umbrales clínicos para esta salida.</p></div>')
-    with st.expander("Consultar los valores utilizados en el cálculo"):
+    proba = float(bundle["pipeline"].predict_proba(patient_df[bundle["feature_columns"]])[0, 1])
+    threshold = float(bundle.get("threshold", 0.5))
+    model_name = html.escape(MODEL_NAMES.get(bundle["model_name"], bundle["model_name"]))
+    st.metric("Probabilidad estimada", f"{proba:.1%}")
+    st.html(f'''<div class="or">
+      <div class="or-track"><i style="width:{min(max(proba, 0), 1) * 100:.1f}%"></i><s style="left:{threshold * 100:.0f}%"></s></div>
+      <div class="or-scale"><span>0 %</span><span>umbral {threshold * 100:.0f} %</span><span>100 %</span></div>
+      <dl class="or-dl"><dt>Modelo</dt><dd>{model_name}</dd><dt>Umbral</dt><dd>{num(threshold, 2)} (elegido en desarrollo)</dd>
+        <dt>Clasificación</dt><dd>{"Igual o por encima del umbral" if proba >= threshold else "Por debajo del umbral"}</dd></dl>
+      <p class="or-note">Probabilidad de clasificación de una condición simulada. No es un diagnóstico ni un riesgo clínico validado.</p></div>''')
+    st.caption("Corresponde a los valores enviados en el último cálculo.")
+    with st.expander("Valores utilizados en el cálculo"):
         st.dataframe(patient_df.rename(columns=VARIABLE_LABELS), width="stretch", hide_index=True)
+
+
+def render_explore(bundle: dict | None):
+    with st.container(key="explorar"):
+        st.html('<div class="or" id="explorar"></div>')
+        left, right = st.columns([1.25, 1], gap="large")
+        with left:
+            st.html('<div class="or or-explore-head"><h2 class="or-d">Explora un caso</h2>'
+                    '<p>Ingresa las variables de un paciente sintético y observa la probabilidad que asigna el modelo. Todos los campos son obligatorios.</p></div>')
+            if bundle is None:
+                st.info("Para habilitar las estimaciones, genera el modelo desde la carpeta del proyecto.", icon=":material/info:")
+                st.code("python scripts/run_pipeline.py --backend local --usar-csv-local", language="bash")
+            else:
+                patient_df = patient_input_form()
+                if patient_df is not None:
+                    st.session_state["oncorisk_input"] = patient_df
+        with right, st.container(key="resultado"):
+            if bundle is not None and "oncorisk_input" in st.session_state:
+                render_prediction(bundle, st.session_state["oncorisk_input"])
+            else:
+                st.html('<div class="or or-out-empty"><span class="or-label">Probabilidad estimada</span><div class="big or-d">—</div>'
+                        '<p>Completa las variables y selecciona «Calcular estimación». El resultado aparecerá aquí.</p></div>')
 
 
 def readable_feature(name: str) -> str:
@@ -211,82 +303,109 @@ def readable_feature(name: str) -> str:
     return feature.replace("_", " ")
 
 
-def render_interpretation(bundle: dict):
-    name = html.escape(MODEL_NAMES.get(bundle["model_name"], bundle["model_name"]))
-    markup(f'<div class="model-note"><span class="eyebrow">MODELO SELECCIONADO</span><h3>{name}</h3><p>Seleccionado entre regresión logística, Random Forest y XGBoost mediante validación cruzada agrupada por paciente.</p></div>')
-    with st.expander("Variables con mayor contribución global", expanded=False):
-        st.write("Describen el comportamiento general del modelo. No explican por sí solas un resultado individual ni indican causalidad.")
-        explanation = explain_model(bundle["pipeline"], top_n=10)
-        explanation["variable"] = explanation["variable"].map(readable_feature)
-        value_column = explanation.columns[1]
-        st.vega_lite_chart(explanation, {
-            "mark": {"type": "bar", "cornerRadiusEnd": 4, "color": "#168eb5"},
-            "encoding": {
-                "y": {"field": "variable", "type": "nominal", "sort": None, "title": None},
-                "x": {"field": value_column, "type": "quantitative", "title": value_column},
-                "tooltip": [{"field": "variable", "type": "nominal"}, {"field": value_column, "type": "quantitative"}],
-            },
-            "height": 300,
-            "config": {"view": {"stroke": None}, "axis": {"labelColor": "#42586d", "titleColor": "#42586d"}},
-        }, width="stretch")
-        st.dataframe(explanation.rename(columns={"variable": "Variable", "coeficiente (log-odds)": "Coeficiente (log-momios)", "importancia_relativa": "Importancia relativa"}), width="stretch", hide_index=True)
-    with st.expander("Ver desempeño en la prueba sintética", expanded=False):
-        ev, ref = bundle["evaluation"]["modelo"], bundle["evaluation"]["modelo_nulo"]
-        a, b, c, d = st.columns(4)
-        a.metric("AUROC", f"{ev['auroc']:.3f}")
-        b.metric("Precisión promedio", f"{ev['pr_auc']:.3f}")
-        c.metric("Brier del modelo", f"{ev['brier_score']:.3f}")
-        d.metric("Brier de referencia", f"{ref['brier_score']:.3f}")
-        st.caption("Evaluación interna con datos sintéticos. Un Brier menor indica mejor desempeño probabilístico; no demuestra utilidad clínica.")
+def render_interpretation(bundle: dict | None):
+    with st.container(key="modelo"):
+        name = html.escape(MODEL_NAMES.get(bundle["model_name"], bundle["model_name"])) if bundle else "Modelo pendiente"
+        st.html(f'<div class="or or-model-head" id="modelo"><h2 class="or-d">{name}</h2>'
+                '<p>Seleccionado entre regresión logística, Random Forest y XGBoost mediante validación cruzada agrupada por paciente.</p></div>')
+        if bundle is None:
+            st.caption("La interpretación y las métricas estarán disponibles después de generar el modelo.")
+            return
+        with st.expander("Variables con mayor contribución global"):
+            st.write("Describen el comportamiento general del modelo. No explican por sí solas un resultado individual ni indican causalidad.")
+            explanation = explain_model(bundle["pipeline"], top_n=10)
+            explanation["variable"] = explanation["variable"].map(readable_feature)
+            value_column = explanation.columns[1]
+            st.vega_lite_chart(explanation, {
+                "mark": {"type": "bar", "color": "#2048ff"},
+                "encoding": {
+                    "y": {"field": "variable", "type": "nominal", "sort": None, "title": None},
+                    "x": {"field": value_column, "type": "quantitative", "title": value_column},
+                    "tooltip": [{"field": "variable", "type": "nominal"}, {"field": value_column, "type": "quantitative"}],
+                },
+                "height": 300,
+                "config": {"view": {"stroke": None}, "axis": {"labelColor": "#0d0f14", "titleColor": "#6d6f76"}},
+            }, width="stretch")
+            st.dataframe(explanation.rename(columns={"variable": "Variable", "coeficiente (log-odds)": "Coeficiente (log-momios)", "importancia_relativa": "Importancia relativa"}), width="stretch", hide_index=True)
+        with st.expander("Desempeño en la prueba reservada"):
+            ev, ref = bundle["evaluation"]["modelo"], bundle["evaluation"]["modelo_nulo"]
+            a, b, c, d = st.columns(4)
+            a.metric("AUROC", f"{ev['auroc']:.3f}")
+            b.metric("Precisión promedio", f"{ev['pr_auc']:.3f}")
+            c.metric("Brier del modelo", f"{ev['brier_score']:.3f}")
+            d.metric("Brier de referencia", f"{ref['brier_score']:.3f}")
+            e, f, g = st.columns(3)
+            e.metric("Sensibilidad", f"{ev['sensibilidad']:.3f}")
+            f.metric("Especificidad", f"{ev['especificidad']:.3f}")
+            g.metric("Umbral técnico", f"{bundle.get('threshold', 0.5):.2f}")
+            st.caption("Evaluación interna con datos sintéticos. Un Brier menor indica mejor desempeño probabilístico; no demuestra utilidad clínica. "
+                       "El umbral se eligió maximizando F1 con predicciones fuera de pliegue del conjunto de desarrollo; no es un punto de corte clínico.")
 
 
-def render_workflow():
-    steps = [("01", "Configura", "Ingresa las variables del caso sintético en el formulario."), ("02", "Explora", "Calcula la estimación y consulta los valores utilizados."), ("03", "Comprende", "Revisa las contribuciones globales y las métricas del modelo.")]
-    rendered = "".join(f'<article class="workflow-step"><span class="step-number">{n}</span><div><h3>{title}</h3><p>{copy}</p></div></article>' for n, title, copy in steps)
-    markup(f'<section id="metodologia" class="content-width section-anchor"><div class="section-heading"><span class="eyebrow">UN PROCESO CLARO</span><h2>Del dato a la exploración</h2><p>Acércate al modelo en tres pasos.</p></div><div class="workflow">{rendered}</div></section>')
+def render_admin_panel():
+    with st.container(key="admin"), st.expander("Panel de administración: actualizar el modelo", icon=":material/settings:"):
+        codigo_esperado = os.getenv("ADMIN_PANEL_CODE", "")
+        if not codigo_esperado:
+            st.caption("No hay código configurado (ADMIN_PANEL_CODE en el archivo .env): este panel queda abierto.")
+        else:
+            ingresado = st.text_input("Código de administrador", type="password", key="admin_code_input")
+            if ingresado != codigo_esperado:
+                if ingresado:
+                    st.error("Código incorrecto.")
+                else:
+                    st.caption("Ingresa el código de administrador para desbloquear esta sección.")
+                return
 
-
-def render_footer():
-    logo = asset_uri("brand.svg", "image/svg+xml")
-    markup(f'''<footer class="site-footer"><div class="footer-grid content-width"><div class="footer-brand"><a class="brand" href="#inicio" target="_self"><img class="brand-mark" src="{logo}" alt=""/><span><span class="brand-name">Onco<span>Risk</span></span><span class="brand-tagline">INVESTIGACIÓN Y ANÁLISIS</span></span></a><p>Un espacio académico para explorar<br>los datos y hacer nuevas preguntas.</p></div><div class="footer-links"><h3>Explora</h3><a href="#proyecto" target="_self">El proyecto</a><a href="#explorar" target="_self">Variables de entrada</a><a href="#resultado" target="_self">Resultados</a></div><div class="footer-links"><h3>Conoce más</h3><a href="#modelo" target="_self">Interpretación del modelo</a><a href="#metodologia" target="_self">Cómo funciona</a><a href="#inicio" target="_self">Volver al inicio ↑</a></div><div class="footer-about"><h3>Proyecto académico</h3><p>Universidad del Norte</p><p>Datos sintéticos · Validación interna<br>Uso experimental</p></div></div><div class="footer-bottom">OncoRisk &nbsp; / &nbsp; Investigación y análisis oncológico &nbsp; / &nbsp; Prototipo académico</div></footer>''')
+        st.caption("Vuelve a entrenar el modelo sin usar la terminal.")
+        fuente = st.radio("Fuente de datos", ["Snowflake (20.000 pacientes)", "Generar lote local pequeño"], index=0, key="admin_fuente")
+        password = ""
+        uses_token = os.getenv("SNOWFLAKE_AUTHENTICATOR", "PROGRAMMATIC_ACCESS_TOKEN").strip().upper() == "PROGRAMMATIC_ACCESS_TOKEN"
+        secret_label = "Token PAT de Snowflake" if uses_token else "Contraseña de Snowflake"
+        if fuente.startswith("Snowflake"):
+            password = st.text_input(secret_label, type="password", key="admin_password",
+                                     help="No se guarda; solo se usa para esta actualización.")
+        if st.button("Entrenar / actualizar modelo", width="stretch", key="admin_entrenar"):
+            if fuente.startswith("Snowflake") and not password:
+                st.error(f"Ingresa el {secret_label[0].lower() + secret_label[1:]}.")
+                return
+            if password:
+                # Con autenticación PAT el conector lee SNOWFLAKE_TOKEN, no SNOWFLAKE_PASSWORD.
+                os.environ["SNOWFLAKE_TOKEN" if uses_token else "SNOWFLAKE_PASSWORD"] = password
+            with st.spinner("Entrenando modelo... puede tardar uno o dos minutos."):
+                try:
+                    usa_snowflake = fuente.startswith("Snowflake")
+                    summary = run_full_pipeline(backend="snowflake" if usa_snowflake else "local", use_snowflake_csv=usa_snowflake)
+                except Exception as exc:
+                    st.error(f"No se pudo entrenar: {exc}")
+                    return
+            load_model_bundle.clear()
+            ev = summary["evaluacion_prueba_reservada"]["modelo"]
+            st.success(f"Modelo actualizado: {summary['modelo_seleccionado']} (AUROC {ev['auroc']:.3f})")
+            st.rerun()
 
 
 def main():
-    markup(f"<style>{(APP_DIR / 'portal.css').read_text(encoding='utf-8')}</style>")
+    st.html(APP_DIR / "portal.css")
     bundle = load_model_bundle()
-    render_header()
     if st.query_params.get("vista") == "estadisticas":
+        render_header(solid=True)
+        st.html('<div class="or-spacer"></div>')
         render_statistics_panel(bundle)
         render_footer()
+        render_motion_script()
         return
+    render_header(solid=False)
     render_hero()
-    render_services()
-    render_project()
-    with st.container(key="tool-section"):
-        markup('<div id="explorar" class="section-anchor"></div><div class="section-heading left"><span class="eyebrow">EXPLORACIÓN INDIVIDUAL</span><h2>Una mirada a las variables</h2><p>Modifica los valores de ejemplo para explorar el comportamiento del modelo. Todos los campos son obligatorios.</p></div>')
-        markup('<div class="notice"><strong>Uso académico y experimental.</strong> Los datos y el modelo son sintéticos. El resultado no es un diagnóstico ni debe utilizarse para tomar decisiones clínicas.</div>')
-        if bundle is None:
-            st.info("La interfaz está lista. Para habilitar las estimaciones, genera el modelo desde la carpeta del proyecto:")
-            st.code("python scripts/run_pipeline.py", language="bash")
-        else:
-            patient_df = patient_input_form()
-            if patient_df is not None:
-                st.session_state["oncorisk_input"] = patient_df
-    with st.container(key="results-section"):
-        markup('<div id="resultado" class="section-anchor"></div><div class="section-heading left"><span class="eyebrow">RESULTADOS</span><h2>Comprende tu exploración</h2><p>Consulta la estimación correspondiente al último caso calculado.</p></div>')
-        if bundle is not None and "oncorisk_input" in st.session_state:
-            render_prediction(bundle, st.session_state["oncorisk_input"])
-        else:
-            markup(f'<div class="empty-state"><span class="service-icon">{icon("chart")}</span><div><h3>Tu resultado aparecerá aquí</h3><p>Completa las variables y selecciona «Calcular estimación» para comenzar.</p><a href="#explorar" target="_self">Ir al formulario &nbsp; ↑</a></div></div>')
-    with st.container(key="interpretation-section"):
-        markup('<div id="modelo" class="section-anchor"></div><div class="section-heading left"><span class="eyebrow">INVESTIGACIÓN TRANSPARENTE</span><h2>Detrás de cada estimación</h2><p>Explora cómo se comporta el modelo en esta demostración.</p></div>')
-        if bundle is not None:
-            render_interpretation(bundle)
-        else:
-            st.caption("La interpretación y las métricas estarán disponibles después de generar el modelo.")
-    render_workflow()
+    render_statement()
+    render_facts(bundle)
+    render_wide()
+    render_method()
+    render_explore(bundle)
+    render_interpretation(bundle)
+    render_close()
     render_admin_panel()
     render_footer()
+    render_motion_script()
 
 
 if __name__ == "__main__":

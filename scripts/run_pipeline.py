@@ -3,9 +3,13 @@
 CLI para ejecutar el pipeline completo del prototipo.
 
 Uso:
-    python scripts/run_pipeline.py                                    # local, ~1.200 sintéticos nuevos
-    python scripts/run_pipeline.py --usar-csv-snowflake                # entrena con los 20.000 ya subidos a Snowflake, guarda capas en local
-    python scripts/run_pipeline.py --backend snowflake --usar-csv-snowflake  # todo contra Snowflake
+    python scripts/run_pipeline.py --backend local --usar-csv-local      # sin conexión: los 20.000 sintéticos de data/synthetic/
+    python scripts/run_pipeline.py --backend local                       # lee los 20.000 de Snowflake, guarda capas en local
+    python scripts/run_pipeline.py --backend snowflake                   # todo contra Snowflake (pide el token PAT)
+    python scripts/run_pipeline.py --backend snowflake --transformar-con-sql  # CLEAN y ANALYTICAL con sql/02 y sql/03
+    python scripts/run_pipeline.py --backend local --usar-datos-locales  # lote sintético pequeño generado al momento
+
+Si no se indica --backend, se usa DATA_BACKEND del .env (o "local" si no existe).
 """
 from __future__ import annotations
 
@@ -48,20 +52,36 @@ def main() -> None:
         choices=["local", "snowflake"],
         help="Dónde escribir RAW/CLEAN/ANALYTICAL. Por defecto usa DATA_BACKEND del .env (local).",
     )
-    parser.add_argument(
+    source = parser.add_mutually_exclusive_group()
+    source.add_argument(
         "--usar-datos-locales",
         action="store_true",
         help="Genera un lote sintético local pequeño en vez de leer los 20.000 pacientes de Snowflake (no requiere conexión).",
     )
+    source.add_argument(
+        "--usar-csv-local",
+        action="store_true",
+        help="Usa la copia local de los mismos 20.000 pacientes sintéticos (data/synthetic/) sin conectarse a Snowflake.",
+    )
+    parser.add_argument(
+        "--transformar-con-sql",
+        action="store_true",
+        help="Construye CLEAN y ANALYTICAL dentro de Snowflake con sql/02 y sql/03 (requiere --backend snowflake).",
+    )
     args = parser.parse_args()
 
-    effective_backend = args.backend or os.getenv("DATA_BACKEND", "snowflake")
-    use_snowflake_csv = not args.usar_datos_locales
+    effective_backend = args.backend or os.getenv("DATA_BACKEND", "local")
+    if args.transformar_con_sql and effective_backend != "snowflake":
+        parser.error("--transformar-con-sql requiere --backend snowflake")
+    use_local_csv = args.usar_csv_local
+    use_snowflake_csv = not (args.usar_datos_locales or use_local_csv)
     needs_snowflake = effective_backend == "snowflake" or use_snowflake_csv
     ensure_snowflake_credentials(needs_snowflake)
 
-    print(f"Ejecutando pipeline completo (backend={effective_backend}, usar_csv_snowflake={use_snowflake_csv})...")
-    summary = run_full_pipeline(csv_path=args.csv, backend=args.backend, use_snowflake_csv=use_snowflake_csv)
+    origin = "csv_local" if use_local_csv else ("snowflake" if use_snowflake_csv else "generador_local")
+    print(f"Ejecutando pipeline completo (backend={effective_backend}, origen={origin})...")
+    summary = run_full_pipeline(csv_path=args.csv, backend=effective_backend, use_snowflake_csv=use_snowflake_csv,
+                                use_local_synthetic_csv=use_local_csv, transform_with_sql=args.transformar_con_sql)
    
     print("\n=== Resumen ===")
     print(f"Modelo seleccionado: {summary['modelo_seleccionado']}")
@@ -70,6 +90,8 @@ def main() -> None:
     for name, scores in summary["resultados_validacion_cruzada"].items():
         print(f"  - {name}: {scores['cv_mean']:.4f} (+/- {scores['cv_std']:.4f})")
 
+    umbral = summary["umbral_seleccionado"]
+    print(f"\nUmbral elegido en desarrollo (fuera de pliegue, máx. F1): {umbral['umbral']:.2f}")
     print("\nMétricas del modelo seleccionado sobre el conjunto de prueba reservado:")
     print(json.dumps(summary["evaluacion_prueba_reservada"]["modelo"], ensure_ascii=False, indent=2))
 

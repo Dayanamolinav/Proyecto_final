@@ -455,11 +455,13 @@ def cached_model_diagnostics(_bundle, model_name: str, model_fingerprint: str, t
 
 def model_evaluation(bundle):
     st.markdown("#### Evaluación del modelo en la prueba reservada original")
-    st.info("Esta vista utiliza la prueba reservada de 240 pacientes de la ejecución anterior, no el CSV de 20.000. Los filtros de la cohorte no modifican esta prueba. Se reconstruye la partición y se comprueba que reproduce las métricas guardadas; el modelo no se reentrena.")
+    st.info("Esta vista utiliza la prueba reservada (20% de los pacientes de la base ANALYTICAL con la que se entrenó el modelo). Los filtros de la cohorte no modifican esta prueba. Se reconstruye la partición y se comprueba que reproduce las métricas guardadas; el modelo no se reentrena.")
     if bundle is None:
         st.warning("No hay un modelo persistido disponible.")
         return
-    threshold = st.slider("Umbral de clasificación del modelo", .05, .95, .5, .05, key="stats_model_threshold")
+    selected = float(bundle.get("threshold", .5))
+    threshold = st.slider("Umbral de clasificación del modelo", .05, .95, selected, .01, key="stats_model_threshold",
+                          help=f"Por defecto, {selected:.2f}: el umbral elegido con datos de desarrollo (máx. F1 fuera de pliegue).")
     import hashlib
     import pickle
     try:
@@ -631,7 +633,7 @@ def quality_and_data(data: pd.DataFrame, context: dict, metadata: dict):
 def render_statistics_panel(bundle=None):
     """Renderiza el panel completo sin modificar la inferencia individual existente."""
     with st.container(key="statistics-section"):
-        st.markdown('<div class="statistics-heading"><span class="eyebrow">ANÁLISIS DE LA COHORTE</span><h1>Análisis Estadístico e Inferencial</h1><p>Demografía, distribuciones clínicas, asociaciones, estimaciones y evaluación del modelo.</p></div>', unsafe_allow_html=True)
+        st.markdown('<div class="statistics-heading"><span class="eyebrow">ANÁLISIS DE LA COHORTE</span><h1>Análisis estadístico e inferencial</h1><p>Demografía, distribuciones clínicas, asociaciones, estimaciones y evaluación del modelo.</p></div>', unsafe_allow_html=True)
         try:
             source, metadata = load_patient_data()
         except (OSError, ValueError) as exc:

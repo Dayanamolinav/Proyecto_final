@@ -52,6 +52,22 @@ CV_FOLDS = 5
 
 MODEL_CANDIDATES = ["logistic_regression", "random_forest", "xgboost"]
 
+# Pesos de clase. Se desactivan porque, en validación cruzada sobre el
+# conjunto de DESARROLLO, los pesos inflaban las probabilidades y dejaban el
+# Brier de los tres modelos por encima del modelo nulo (≈0,21 frente a 0,187),
+# sin mejorar el AUROC. El desbalance se maneja con el umbral (abajo), que no
+# altera las probabilidades. Ver documentacion/decisiones_modelado.md.
+USE_CLASS_WEIGHTS = False
+
+# El umbral de clasificación se elige con las predicciones fuera de pliegue
+# (out-of-fold) del conjunto de desarrollo, nunca con la prueba reservada
+# (Marco conceptual, "Umbral de clasificación"). Se maximiza F1 en esta rejilla.
+THRESHOLD_GRID = [round(0.05 + 0.01 * i, 2) for i in range(91)]  # 0,05 … 0,95
+
+# Copia local del lote de 20.000 pacientes sintéticos que se cargó a Snowflake
+# (RAW.PACIENTES_PRUEBA_SINTETICOS). Permite reproducir el entrenamiento sin conexión.
+LOCAL_SYNTHETIC_CSV = DATA_DIR / "synthetic" / "pacientes_sinteticos_20000.csv"
+
 # Umbral de alta ausencia a partir del cual una variable se revisa con más
 # cuidado antes de decidir su tratamiento (imputación/eliminación), según la
 # Fase 2 (plan de calidad) del informe.

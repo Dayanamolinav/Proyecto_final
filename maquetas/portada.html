@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OncoRisk</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--ink:#0d0f14;--paper:#f2f0eb;--mute:#6d6f76;--rule:#d9d6cf;--blue:#2048ff;--night:#07090f;
+  --display:"Archivo",sans-serif;--text:"Instrument Sans",sans-serif;--pad:clamp(20px,4vw,56px)}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--paper);color:var(--ink);font-family:var(--text);font-size:17px;line-height:1.55;-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+img,video{display:block;width:100%;height:100%;object-fit:cover}
+.d{font-family:var(--display);font-stretch:112%;font-weight:800;letter-spacing:-.035em;line-height:.88}
+.label{font-size:12px;letter-spacing:.16em;text-transform:uppercase;font-weight:600}
+.link{display:inline-flex;align-items:center;gap:10px;font-weight:600;border-bottom:2px solid currentColor;padding-bottom:4px}
+.link span{transition:transform .3s}.link:hover span{transform:translateX(5px)}
+
+header{position:fixed;inset:0 0 auto;z-index:20;display:flex;justify-content:space-between;align-items:center;padding:22px var(--pad);color:#fff;transition:background .4s,color .4s,padding .4s}
+header.solid{background:rgba(242,240,235,.92);backdrop-filter:blur(10px);color:var(--ink);padding-block:14px}
+header .logo{font-family:var(--display);font-weight:800;font-stretch:112%;font-size:20px;letter-spacing:-.02em}
+header nav{display:flex;gap:34px;font-size:14px;font-weight:500}
+
+/* portada */
+.hero{position:relative;height:100svh;min-height:640px;color:#fff;overflow:hidden;background:var(--night)}
+.hero video{position:absolute;inset:0;transform:scale(1.08)}
+.hero::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(7,9,15,.25) 0%,rgba(7,9,15,.1) 40%,rgba(7,9,15,.78) 100%)}
+.hero-in{position:absolute;inset:auto 0 0;z-index:2;padding:0 var(--pad) 36px}
+.hero h1{font-size:clamp(84px,17.5vw,300px);margin-left:-.04em}
+.hero h1 .ch{display:inline-block;transform:translateY(110%);animation:up 1s cubic-bezier(.2,.8,.2,1) forwards}
+@keyframes up{to{transform:none}}
+.hero-meta{display:grid;grid-template-columns:repeat(4,1fr);gap:24px;margin-top:26px;padding-top:18px;border-top:1px solid rgba(255,255,255,.35);font-size:14px;color:rgba(255,255,255,.82)}
+.hero-meta b{display:block;color:#fff;font-weight:600}
+
+/* manifiesto */
+.statement{padding:clamp(90px,14vw,190px) var(--pad)}
+.statement p{font-family:var(--display);font-stretch:100%;font-weight:600;font-size:clamp(30px,4.3vw,64px);line-height:1.08;letter-spacing:-.025em;max-width:1300px}
+.statement .w{color:#c9c6bf;transition:color .25s}
+.statement .w.on{color:var(--ink)}
+.statement .w.hl.on{color:var(--blue)}
+
+/* cifras + foto */
+.split{display:grid;grid-template-columns:1.15fr 1fr;gap:0;min-height:100vh}
+.split .photo{position:relative;overflow:hidden;clip-path:inset(12% 12% 12% 0);transition:clip-path 1.4s cubic-bezier(.2,.8,.2,1)}
+.split .photo.in{clip-path:inset(0)}
+.split .photo img{transform:scale(1.25);transition:transform 2.2s cubic-bezier(.2,.8,.2,1)}
+.split .photo.in img{transform:scale(1)}
+.split .facts{padding:clamp(40px,6vw,90px) var(--pad);display:flex;flex-direction:column;justify-content:center}
+.fact{display:grid;grid-template-columns:1fr auto;align-items:end;gap:20px;padding:26px 0;border-bottom:1px solid var(--rule)}
+.fact:first-of-type{border-top:1px solid var(--ink)}
+.fact b{font-family:var(--display);font-stretch:112%;font-weight:800;font-size:clamp(54px,6.4vw,104px);letter-spacing:-.045em;line-height:.9}
+.fact span{font-size:14px;color:var(--mute);text-align:right;max-width:190px}
+.facts h2{font-size:clamp(28px,2.6vw,38px);margin-bottom:34px;font-stretch:100%;line-height:1}
+
+/* video ancho */
+.wide{position:relative;height:110vh;overflow:hidden;color:#fff;background:var(--night)}
+.wide video{position:absolute;inset:-12% 0;height:124%;will-change:transform}
+.wide::after{content:"";position:absolute;inset:0;background:rgba(7,9,15,.38)}
+.wide-in{position:absolute;z-index:2;left:var(--pad);right:var(--pad);bottom:12vh}
+.wide h2{font-size:clamp(56px,9vw,150px);max-width:1200px}
+.wide p{max-width:520px;margin-top:22px;color:rgba(255,255,255,.85);font-size:18px}
+.marquee{overflow:hidden;border-block:1px solid var(--ink);padding:18px 0;white-space:nowrap}
+.marquee div{display:inline-block;animation:slide 26s linear infinite;font-family:var(--display);font-stretch:118%;font-weight:800;font-size:clamp(28px,3.4vw,46px);letter-spacing:-.02em}
+.marquee i{font-style:normal;color:var(--blue);margin:0 .6em}
+@keyframes slide{to{transform:translateX(-50%)}}
+
+/* método fijo */
+.method{display:grid;grid-template-columns:1fr 1fr;padding:0}
+.method .media{position:sticky;top:0;height:100vh;overflow:hidden;background:var(--night)}
+.method .media > *{position:absolute;inset:0;opacity:0;transition:opacity .9s ease,transform 1.6s ease;transform:scale(1.06)}
+.method .media > .on{opacity:1;transform:scale(1)}
+.method .idx{position:absolute;z-index:3;left:28px;bottom:24px;color:#fff;font-family:var(--display);font-weight:800;font-size:120px;line-height:.8;opacity:1!important;transform:none!important;inset:auto auto 24px 28px}
+.steps{padding:0 var(--pad)}
+.step{min-height:100vh;display:flex;flex-direction:column;justify-content:center;max-width:520px;opacity:.28;transition:opacity .5s}
+.step.on{opacity:1}
+.step .label{color:var(--blue);margin-bottom:18px}
+.step h3{font-size:clamp(44px,5vw,78px);margin-bottom:22px}
+.step p{color:var(--mute);font-size:18px}
+.step code{font-family:ui-monospace,monospace;font-size:15px;color:var(--ink)}
+
+/* explorador */
+.explore{padding:clamp(90px,12vw,170px) var(--pad);display:grid;grid-template-columns:1.2fr 1fr;gap:clamp(40px,7vw,120px);align-items:start}
+.explore h2{font-size:clamp(48px,6vw,96px);margin-bottom:18px}
+.explore .intro{color:var(--mute);max-width:460px;margin-bottom:46px}
+.form{display:grid;grid-template-columns:repeat(3,1fr);column-gap:30px}
+.f{padding:16px 0 12px;border-bottom:1px solid var(--ink)}
+.f label{display:block;font-size:12px;color:var(--mute);margin-bottom:4px}
+.f div{display:flex;justify-content:space-between;font-size:20px;font-weight:500}
+.f em{font-style:normal;font-size:13px;color:var(--mute);align-self:flex-end}
+.explore .go{margin-top:40px}
+.out{position:sticky;top:110px;padding-top:6px}
+.out .label{color:var(--mute)}
+.out .big{font-size:clamp(120px,15vw,240px);margin:10px 0 6px;color:var(--ink)}
+.out .big small{font-size:.4em;letter-spacing:-.02em}
+.track{position:relative;height:2px;background:var(--rule);margin:22px 0 10px}
+.track i{position:absolute;left:0;top:-1px;height:4px;width:0;background:var(--blue);transition:width 1.6s cubic-bezier(.2,.8,.2,1)}
+.track s{position:absolute;top:-10px;width:1px;height:22px;background:var(--ink);left:25%}
+.scale{display:flex;justify-content:space-between;font-size:12px;color:var(--mute)}
+.out p{margin-top:30px;color:var(--mute);font-size:15px;max-width:420px}
+.out dl{display:grid;grid-template-columns:auto 1fr;gap:6px 18px;margin-top:26px;font-size:15px}
+.out dt{color:var(--mute)}
+
+/* cierre */
+.close{position:relative;min-height:100vh;color:#fff;overflow:hidden;display:flex;align-items:flex-end;background:var(--night)}
+.close video{position:absolute;inset:0}
+.close::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,rgba(7,9,15,.88) 0%,rgba(7,9,15,.45) 55%,rgba(7,9,15,.1) 100%)}
+.close-in{position:relative;z-index:2;padding:0 var(--pad) 9vh;max-width:900px}
+.close h2{font-size:clamp(50px,6.6vw,108px);margin-bottom:24px}
+.close p{max-width:500px;color:rgba(255,255,255,.82);margin-bottom:36px;font-size:18px}
+
+footer{background:var(--night);color:#9da3b4;padding:60px var(--pad) 40px;display:grid;grid-template-columns:2fr 1fr 1fr;gap:30px;font-size:14px}
+footer .logo{font-family:var(--display);font-weight:800;font-stretch:112%;font-size:clamp(60px,9vw,140px);color:#fff;letter-spacing:-.04em;line-height:.85;grid-column:1/-1;margin-bottom:40px}
+footer a{display:block;color:#fff;margin-top:6px}
+
+.rv{opacity:0;transform:translateY(40px);transition:opacity 1s ease,transform 1s cubic-bezier(.2,.8,.2,1)}
+.rv.in{opacity:1;transform:none}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}.rv,.hero h1 .ch{opacity:1;transform:none}.split .photo{clip-path:none}}
+@media (max-width:900px){
+  header nav{display:none}.hero-meta{grid-template-columns:1fr 1fr}
+  .split,.method,.explore{grid-template-columns:1fr}.split .photo{height:70vh}
+  .method .media{position:relative;height:60vh}.step{min-height:auto;padding:60px 0;opacity:1}
+  .form{grid-template-columns:1fr 1fr}.out{position:static}footer{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <a class="logo" href="#">OncoRisk</a>
+  <nav aria-label="Secciones"><a href="#proyecto">Proyecto</a><a href="#metodo">Método</a><a href="#explorar">Explorar</a><a href="#">Análisis estadístico</a></nav>
+</header>
+
+<section class="hero">
+  <video autoplay muted loop playsinline poster="../app/static/media/v13_celulas_poster.jpg"><source src="../app/static/media/v13_celulas.mp4" type="video/mp4"></video>
+  <div class="hero-in">
+    <h1 class="d" aria-label="OncoRisk"><span class="ch">Onco</span><span class="ch" style="animation-delay:.12s">Risk</span></h1>
+    <div class="hero-meta">
+      <div><b>Universidad del Norte</b>Ingeniería de Sistemas</div>
+      <div><b>Ingeniería de datos</b>Snowflake · SQL · Python</div>
+      <div><b>Aprendizaje automático</b>Tres modelos comparados</div>
+      <div><b>Prototipo académico</b>Datos sintéticos</div>
+    </div>
+  </div>
+</section>
+
+<section class="statement" id="proyecto">
+  <p id="manifiesto">Integramos, limpiamos y analizamos <span class="hl">20.000 registros clínicos</span> para identificar qué características se asocian con un mayor <span class="hl">riesgo oncológico</span>, y dejamos rastro de cada paso.</p>
+</section>
+
+<section class="split">
+  <div class="photo"><img src="../app/static/media/f23_cientifica.jpg" alt="Investigadora observando una muestra en el microscopio"></div>
+  <div class="facts">
+    <h2 class="d rv">El modelo, en cifras</h2>
+    <div class="fact rv"><b data-count="20000" data-sep="1">0</b><span>pacientes sintéticos en la base analítica</span></div>
+    <div class="fact rv"><b data-count="0.734" data-dec="3">0</b><span>AUROC en la prueba reservada de 4.000 pacientes</span></div>
+    <div class="fact rv"><b data-count="0.160" data-dec="3">0</b><span>Brier del modelo, frente a 0,187 del modelo nulo</span></div>
+    <div class="fact rv"><b data-count="47">0</b><span>pruebas automatizadas aprobadas</span></div>
+  </div>
+</section>
+
+<section class="wide">
+  <video autoplay muted loop playsinline poster="../app/static/media/v7_microscopios_poster.jpg" id="parallax"><source src="../app/static/media/v7_microscopios.mp4" type="video/mp4"></video>
+  <div class="wide-in">
+    <h2 class="d rv">Investigación con trazabilidad</h2>
+    <p class="rv">Cada registro conserva su procedencia: desde que entra a Snowflake hasta que el modelo emite una estimación.</p>
+  </div>
+</section>
+
+<div class="marquee" aria-hidden="true"><div>
+  Ingesta<i>/</i>RAW<i>/</i>CLEAN<i>/</i>ANALYTICAL<i>/</i>Modelado<i>/</i>Evaluación<i>/</i>Ingesta<i>/</i>RAW<i>/</i>CLEAN<i>/</i>ANALYTICAL<i>/</i>Modelado<i>/</i>Evaluación<i>/</i>
+</div></div>
+
+<section class="method" id="metodo">
+  <div class="media" aria-hidden="true">
+    <video class="on" autoplay muted loop playsinline poster="../app/static/media/v2_tubo_poster.jpg"><source src="../app/static/media/v2_tubo.mp4" type="video/mp4"></video>
+    <img src="../app/static/media/f27_microscopio.jpg" alt="">
+    <video autoplay muted loop playsinline poster="../app/static/media/v17_medica_poster.jpg"><source src="../app/static/media/v17_medica.mp4" type="video/mp4"></video>
+    <img src="../app/static/media/f23_cientifica.jpg" alt="">
+    <span class="idx" id="idx">01</span>
+  </div>
+  <div class="steps">
+    <article class="step on" data-i="0"><span class="label">01 · Ingesta</span><h3 class="d">El dato entra con su historia</h3><p>El CSV se sube a un Stage de Snowflake y se carga con <code>COPY INTO</code>. Cada carga queda registrada con su archivo, sus filas y su fecha.</p></article>
+    <article class="step" data-i="1"><span class="label">02 · Transformación</span><h3 class="d">Reglas claras, sin atajos</h3><p>SQL construye las capas CLEAN y ANALYTICAL: quita duplicados, valores imposibles y variables posteriores al diagnóstico. La bitácora guarda cada regla.</p></article>
+    <article class="step" data-i="2"><span class="label">03 · Modelado</span><h3 class="d">Tres modelos, una comparación justa</h3><p>Regresión logística, Random Forest y XGBoost con validación cruzada agrupada por paciente. El umbral se elige solo con datos de desarrollo.</p></article>
+    <article class="step" data-i="3"><span class="label">04 · Evaluación</span><h3 class="d">Una sola prueba, sin repetir</h3><p>El modelo elegido se evalúa una vez en 4.000 pacientes reservados: discriminación, calibración y clasificación.</p></article>
+  </div>
+</section>
+
+<section class="explore" id="explorar">
+  <div>
+    <h2 class="d rv">Explora un caso</h2>
+    <p class="intro rv">Ingresa las variables de un paciente sintético y observa la probabilidad que asigna el modelo.</p>
+    <div class="form rv">
+      <div class="f"><label>Edad</label><div>55<em>años</em></div></div>
+      <div class="f"><label>Sexo</label><div>Femenino<em>▾</em></div></div>
+      <div class="f"><label>IMC</label><div>26,5<em>kg/m²</em></div></div>
+      <div class="f"><label>Tabaquismo</label><div>Nunca<em>▾</em></div></div>
+      <div class="f"><label>Antecedente familiar</label><div>No<em>▾</em></div></div>
+      <div class="f"><label>Antecedente personal</label><div>No<em>▾</em></div></div>
+      <div class="f"><label>Presión sistólica</label><div>125<em>mmHg</em></div></div>
+      <div class="f"><label>Glucosa</label><div>98<em>mg/dL</em></div></div>
+      <div class="f"><label>Paridad</label><div>1</div></div>
+      <div class="f"><label>CA-125</label><div>18,0<em>U/mL</em></div></div>
+      <div class="f"><label>Hallazgo de imagen</label><div>Normal<em>▾</em></div></div>
+    </div>
+    <a class="link go rv" href="#explorar">Calcular estimación <span>→</span></a>
+  </div>
+  <div class="out rv" id="out">
+    <span class="label">Probabilidad estimada</span>
+    <div class="big d"><span data-count="12.0" data-dec="1">0</span><small>%</small></div>
+    <div class="track"><i data-w="12"></i><s title="Umbral técnico 0,25"></s></div>
+    <div class="scale"><span>0 %</span><span>umbral 25 %</span><span>100 %</span></div>
+    <dl><dt>Modelo</dt><dd>Regresión logística</dd><dt>Umbral</dt><dd>0,25 (elegido en desarrollo)</dd><dt>Clasificación</dt><dd>Por debajo del umbral</dd></dl>
+    <p>Probabilidad de clasificación de una condición simulada. No es un diagnóstico ni un riesgo clínico validado.</p>
+  </div>
+</section>
+
+<section class="close">
+  <video autoplay muted loop playsinline poster="../app/static/media/v17_medica_poster.jpg"><source src="../app/static/media/v17_medica.mp4" type="video/mp4"></video>
+  <div class="close-in">
+    <h2 class="d rv">Los datos también cuentan</h2>
+    <p class="rv">Ocho vistas de análisis estadístico: demografía, distribuciones, correlaciones, contrastes, evolución por semestre, PCA y evaluación del modelo.</p>
+    <a class="link rv" href="#">Abrir el análisis estadístico <span>→</span></a>
+  </div>
+</section>
+
+<footer>
+  <div class="logo">OncoRisk</div>
+  <div>Prototipo académico de ingeniería de datos e inteligencia artificial. Datos sintéticos, validación interna, uso experimental. No emite diagnósticos.</div>
+  <div>Explorar<a href="#proyecto">Proyecto</a><a href="#metodo">Método</a><a href="#explorar">Explorar un caso</a></div>
+  <div>Universidad del Norte<br>Barranquilla, Colombia<br><br>Videos y fotos: Pexels</div>
+</footer>
+
+<script>
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// palabras del manifiesto
+const man = document.getElementById('manifiesto');
+man.innerHTML = man.innerHTML.replace(/(<span class="hl">)(.*?)(<\/span>)|([^\s<]+)/g, (m, a, inner, c, word) =>
+  inner ? inner.split(' ').map(w => `<span class="w hl">${w}</span>`).join(' ') : `<span class="w">${word}</span>`);
+const words = [...man.querySelectorAll('.w')];
+
+// cifras
+const fmt = (v, dec, sep) => { let s = dec ? v.toFixed(dec).replace('.', ',') : Math.round(v).toString(); return sep ? s.replace(/\B(?=(\d{3})+(?!\d))/g, '.') : s; };
+function count(el) { const end = +el.dataset.count, dec = +el.dataset.dec || 0, sep = el.dataset.sep, t0 = performance.now();
+  if (reduce) { el.textContent = fmt(end, dec, sep); return; }
+  (function f(t) { const k = Math.min(1, (t - t0) / 1600), e = 1 - Math.pow(1 - k, 4); el.textContent = fmt(end * e, dec, sep); if (k < 1) requestAnimationFrame(f); })(t0); }
+
+const io = new IntersectionObserver(es => es.forEach(e => { if (!e.isIntersecting) return; const n = e.target;
+  n.classList.add('in'); n.querySelectorAll('[data-count]').forEach(count);
+  n.querySelectorAll('[data-w]').forEach(b => b.style.width = b.dataset.w + '%'); io.unobserve(n); }), { threshold: .25 });
+document.querySelectorAll('.rv, .split .photo').forEach(el => io.observe(el));
+
+// pasos del método
+const media = [...document.querySelectorAll('.method .media > video, .method .media > img')], idx = document.getElementById('idx');
+const stepIo = new IntersectionObserver(es => es.forEach(e => { if (!e.isIntersecting) return; const i = +e.target.dataset.i;
+  document.querySelectorAll('.step').forEach(s => s.classList.toggle('on', s === e.target));
+  media.forEach((m, j) => m.classList.toggle('on', j === i)); idx.textContent = String(i + 1).padStart(2, '0'); }), { rootMargin: '-45% 0px -45% 0px' });
+document.querySelectorAll('.step').forEach(s => stepIo.observe(s));
+
+// efectos ligados al desplazamiento
+const hero = document.querySelector('.hero video'), par = document.getElementById('parallax'), wide = document.querySelector('.wide');
+function onScroll() {
+  const y = scrollY, h = innerHeight;
+  if (!reduce) {
+    hero.style.transform = `scale(${1.08 + y / h * .12}) translateY(${y * .25}px)`;
+    const r = wide.getBoundingClientRect(); par.style.transform = `translateY(${(r.top / h) * -9}%)`;
+  }
+  const mr = man.getBoundingClientRect(), p = Math.min(1, Math.max(0, (h * .85 - mr.top) / (mr.height + h * .35)));
+  const lit = Math.round(p * words.length); words.forEach((w, i) => w.classList.toggle('on', i < lit));
+}
+const head = document.querySelector('header'), heroBox = document.querySelector('.hero');
+const darkSections = [heroBox, wide, document.querySelector('.close')];
+function onHeader() { const y = 40; head.classList.toggle('solid', !darkSections.some(s => { const r = s.getBoundingClientRect(); return r.top <= y && r.bottom > y; })); }
+addEventListener('scroll', () => requestAnimationFrame(() => { onScroll(); onHeader(); }), { passive: true });
+const jump = location.hash.match(/^#y=(\d+)/); if (jump) { document.documentElement.style.scrollBehavior = 'auto'; scrollTo(0, +jump[1]); }
+onScroll(); onHeader();
+</script>
+</body>
+</html>

@@ -8,7 +8,7 @@ Modelo de almacenamiento en tres capas (Sección VII-A.3 y VII-B.3):
 Por defecto (backend="local", sin costo) las capas se guardan como Parquet
 local (data/raw, data/clean, data/analytical). Con backend="snowflake" (o
 DATA_BACKEND=snowflake en el .env), las mismas funciones `write_layer`/
-`read_layer` escriben y leen directamente de tu cuenta real de Snowflake
+`read_layer` escriben y leen directamente en la cuenta de Snowflake del proyecto
 (esquemas RAW/CLEAN/ANALYTICAL de ONCORISK_DB, creados por
 sql/00_setup_inicial.sql), usando la conexión ya configurada en
 `snowflake_connection.py`. El resto de la canalización (cleaning,

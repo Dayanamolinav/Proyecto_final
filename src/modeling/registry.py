@@ -34,6 +34,10 @@ class ExperimentRecord:
     training_seconds: float
     n_train: int
     n_test: int
+    usa_pesos_clase: bool = False
+    metricas_fuera_de_pliegue: dict[str, float] = field(default_factory=dict)
+    umbral: dict[str, Any] = field(default_factory=dict)
+    origen_datos: str = ""
     timestamp_utc: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
     def to_dict(self) -> dict[str, Any]:

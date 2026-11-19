@@ -43,6 +43,18 @@ def connection_parameters() -> dict[str, str | bool]:
     return parameters
 
 
+def ask_for_missing_secret() -> None:
+    """Pide de forma oculta el token PAT o la contraseña si no están en el
+    entorno. El valor vive solo durante el proceso; no se escribe en disco."""
+    import getpass
+
+    authenticator = (_value("SNOWFLAKE_AUTHENTICATOR") or "PROGRAMMATIC_ACCESS_TOKEN").upper()
+    if authenticator == "PROGRAMMATIC_ACCESS_TOKEN" and not _value("SNOWFLAKE_TOKEN"):
+        os.environ["SNOWFLAKE_TOKEN"] = getpass.getpass("Token PAT de Snowflake (no se mostrará ni guardará): ")
+    elif authenticator in {"SNOWFLAKE", "USERNAME_PASSWORD_MFA"} and not _value("SNOWFLAKE_PASSWORD"):
+        os.environ["SNOWFLAKE_PASSWORD"] = getpass.getpass("Contraseña de Snowflake (no se mostrará ni guardará): ")
+
+
 @contextmanager
 def snowflake_connection() -> Iterator[object]:
     try:

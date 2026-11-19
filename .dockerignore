@@ -1,0 +1,20 @@
+# Secretos y entornos locales: nunca entran a la imagen
+.env
+.env.*
+!.env.snowflake.example
+*.pem
+*.p8
+.venv/
+venv/
+.git/
+__pycache__/
+**/__pycache__/
+.ipynb_checkpoints/
+
+# Artefactos que la imagen regenera al construirse
+data/raw/
+data/clean/
+data/analytical/
+models/
+logs/
+reports/*.jsonl

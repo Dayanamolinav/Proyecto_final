@@ -1,6 +1,6 @@
 # Diccionario de datos de la muestra sintética
 
-Versión 1.0; fecha 2026-11-13. Responsable: equipo del proyecto, pendiente de asignar. Este diccionario describe el generador actual y no predice la estructura del CSV del hospital. Los campos y reglas reales deben revisarse antes de incorporarlos.
+Versión 1.1; fecha 2026-11-17. Responsable: equipo del proyecto. Este diccionario describe el generador actual y no predice la estructura del CSV del hospital. Los campos y reglas reales deben revisarse antes de incorporarlos.
 
 | Variable | Tipo / valores simulados | Función y tratamiento |
 |---|---|---|
@@ -21,7 +21,7 @@ Versión 1.0; fecha 2026-11-13. Responsable: equipo del proyecto, pendiente de a
 | `periodo` | 2023-S1, 2023-S2, 2024-S1, 2024-S2 | Período simulado; metadato, no predictor. |
 | `riesgo_oncologico` | binaria 0/1 | Etiqueta sintética de clasificación, no estimación validada de riesgo futuro. |
 | `fecha_diagnostico_confirmado`, `tratamiento_indicado`, `comentario_oncologo` | fecha/texto | Campos posteriores al desenlace simulados: se eliminan antes del modelado para evitar fuga. |
-| `imc_categoria` | bajo_peso, normal, sobrepeso, obesidad | Derivada de IMC con los cortes definidos en el código; predicción sintética. |
-| `grupo_etario` | <40, 40-54, 55-69, 70+ | Derivada de edad con los cortes definidos en el código; revisar límites y nombres si se cambia la definición. |
+| `imc_categoria` | bajo_peso (<18,5), normal (<25), sobrepeso (<30), obesidad | Derivada de IMC (`derived_variables.py` y `sql/03`); si falta el IMC queda vacía y se imputa con la moda de desarrollo. |
+| `grupo_etario` | <40, 40-54, 55-69, 70+ | Derivada de edad con los mismos cortes en Python y SQL; si falta la edad queda vacía. Revisar límites y nombres si se cambia la definición. |
 
 El preprocesamiento emplea imputación numérica por mediana, imputación categórica por moda, escalado y codificación categórica; se ajusta en entrenamiento. La lista fija de campos posteriores no garantiza eliminar todas las fugas de un archivo desconocido. La unidad de análisis real y la disponibilidad temporal de cada predictor deben confirmarse.

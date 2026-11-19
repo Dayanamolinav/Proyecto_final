@@ -1,13 +1,9 @@
 """
 Entrenamiento y comparación de modelos (Sección VI-C Fase 3, VI-D.5 y VII-A.5):
-regresión logística, Random Forest y XGBoost, con validación cruzada,
-manejo de desbalance de clases mediante pesos, y partición de prueba
-reservada que SOLO se evalúa una vez al final (Fase 4).
-
-Inspirado en el enfoque de pesos de clase y comparación de modelos del
-notebook de referencia (PCA/LDA sobre Breast Cancer Wisconsin) que el
-usuario adjuntó como ejemplo, adaptado a un pipeline tabular reproducible
-con scikit-learn `Pipeline`/`ColumnTransformer` en lugar de PCA manual.
+regresión logística, Random Forest y XGBoost, con validación cruzada
+agrupada por paciente, predicciones fuera de pliegue para calibración y
+umbral, y partición de prueba reservada que SOLO se evalúa una vez al final
+(Fase 4). Los pesos de clase son opcionales (config.USE_CLASS_WEIGHTS).
 """
 from __future__ import annotations
 
@@ -16,9 +12,11 @@ from dataclasses import dataclass
 
 import numpy as np
 import pandas as pd
+from sklearn.base import clone
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import StratifiedGroupKFold, cross_val_score, train_test_split
+from sklearn.metrics import roc_auc_score
+from sklearn.model_selection import StratifiedGroupKFold, train_test_split
 from sklearn.pipeline import Pipeline
 
 try:
@@ -28,7 +26,7 @@ try:
 except ImportError:  # pragma: no cover - fallback si xgboost no está instalado
     _HAS_XGBOOST = False
 
-from config import CV_FOLDS, PATIENT_ID_COLUMN, RANDOM_SEED, TARGET_COLUMN, TEST_SIZE
+from config import CV_FOLDS, PATIENT_ID_COLUMN, RANDOM_SEED, TARGET_COLUMN, TEST_SIZE, USE_CLASS_WEIGHTS
 from src.processing.feature_engineering import build_preprocessor, get_feature_lists
 
 
@@ -72,16 +70,17 @@ def make_train_test_split(analytical_df: pd.DataFrame, target_col: str = TARGET_
 
 
 def _class_weight_dict(y: pd.Series) -> dict[int, float]:
-    """Pesos de clase inversamente proporcionales a la frecuencia, igual que
-    en el notebook de referencia (max(counts)/counts)."""
+    """Pesos de clase inversamente proporcionales a la frecuencia (max(counts)/counts)."""
     counts = y.value_counts()
     weights = counts.max() / counts
     return weights.round(4).to_dict()
 
 
-def build_candidate_models(y_train: pd.Series) -> dict[str, Pipeline]:
-    class_weights = _class_weight_dict(y_train)
-    numeric, categorical = None, None  # se inyectan al construir el preprocesador externamente
+def build_candidate_models(y_train: pd.Series, use_class_weights: bool = USE_CLASS_WEIGHTS) -> dict[str, Pipeline]:
+    """Modelos candidatos. Con `use_class_weights=False` (opción por defecto,
+    ver config.py) se entrenan sin pesos para conservar probabilidades bien
+    calibradas; el desbalance se aborda con el umbral elegido en desarrollo."""
+    class_weights = _class_weight_dict(y_train) if use_class_weights else None
 
     models: dict[str, object] = {
         "logistic_regression": LogisticRegression(
@@ -100,7 +99,7 @@ def build_candidate_models(y_train: pd.Series) -> dict[str, Pipeline]:
     if _HAS_XGBOOST:
         # XGBoost usa scale_pos_weight en lugar de class_weight
         neg, pos = y_train.value_counts().reindex([0, 1]).fillna(0)
-        scale_pos_weight = float(neg / max(pos, 1))
+        scale_pos_weight = float(neg / max(pos, 1)) if use_class_weights else 1.0
         models["xgboost"] = XGBClassifier(
             n_estimators=300,
             max_depth=4,
@@ -120,27 +119,42 @@ def fit_and_cross_validate(
 ) -> dict[str, dict]:
     """Ajusta cada modelo candidato dentro de un Pipeline con el
     preprocesador (imputación/codificación/escalado) y evalúa por validación
-    cruzada estratificada SOLO sobre el conjunto de entrenamiento, evitando
-    fuga de información hacia la partición de prueba."""
+    cruzada estratificada y agrupada por paciente SOLO sobre el conjunto de
+    desarrollo, evitando fuga de información hacia la partición de prueba.
+
+    Además de los AUROC por pliegue, conserva las probabilidades fuera de
+    pliegue (`oof_proba`): cada paciente de desarrollo recibe la predicción de
+    un modelo que no lo vio. Con ellas se evalúan la calibración (Brier) y se
+    elige el umbral sin tocar la prueba reservada."""
+    if scoring != "roc_auc":
+        raise ValueError("La validación cruzada del prototipo usa AUROC como métrica principal.")
     numeric, categorical = get_feature_lists(split.X_train)
 
     candidate_estimators = build_candidate_models(split.y_train)
 
     cv = StratifiedGroupKFold(n_splits=CV_FOLDS, shuffle=True, random_state=RANDOM_SEED)
+    folds = list(cv.split(split.X_train, split.y_train, groups=split.groups_train))
+    y_dev = split.y_train.to_numpy()
     results: dict[str, dict] = {}
 
     for name, estimator in candidate_estimators.items():
         pipeline = Pipeline(steps=[("preprocess", build_preprocessor(numeric, categorical)), ("model", estimator)])
         start = time.time()
-        cv_scores = cross_val_score(pipeline, split.X_train, split.y_train, cv=cv, groups=split.groups_train, scoring=scoring, n_jobs=-1, error_score="raise")
+        oof_proba = np.full(len(y_dev), np.nan)
+        cv_scores = []
+        for train_idx, valid_idx in folds:
+            fold_model = clone(pipeline).fit(split.X_train.iloc[train_idx], split.y_train.iloc[train_idx])
+            oof_proba[valid_idx] = fold_model.predict_proba(split.X_train.iloc[valid_idx])[:, 1]
+            cv_scores.append(roc_auc_score(y_dev[valid_idx], oof_proba[valid_idx]))
         pipeline.fit(split.X_train, split.y_train)
         elapsed = time.time() - start
 
         results[name] = {
             "pipeline": pipeline,
-            "cv_scores": cv_scores.tolist(),
+            "cv_scores": [float(s) for s in cv_scores],
             "cv_mean": float(np.mean(cv_scores)),
             "cv_std": float(np.std(cv_scores)),
+            "oof_proba": oof_proba,
             "training_seconds": elapsed,
             "hyperparameters": {
                 k: v for k, v in estimator.get_params().items() if not callable(v)

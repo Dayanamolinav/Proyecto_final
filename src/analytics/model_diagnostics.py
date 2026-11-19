@@ -25,7 +25,7 @@ def recover_holdout(bundle: dict, path: str | Path) -> pd.DataFrame:
     probability = bundle["pipeline"].predict_proba(split.X_test[bundle["feature_columns"]])[:, 1]
     y = split.y_test.to_numpy(dtype=int)
     expected = bundle["evaluation"]["modelo"]
-    cm = confusion_matrix(y, probability >= .5, labels=[0, 1]).ravel()
+    cm = confusion_matrix(y, probability >= bundle.get("threshold", .5), labels=[0, 1]).ravel()
     stored = [expected[k] for k in ("n_verdaderos_negativos", "n_falsos_positivos", "n_falsos_negativos", "n_verdaderos_positivos")]
     if not np.array_equal(cm, stored) or not np.isclose(roc_auc_score(y, probability), expected["auroc"], atol=.000051):
         raise ValueError("La base analítica y el modelo no reproducen la evaluación persistida. Regenere artefactos coherentes antes de visualizar la prueba reservada.")

@@ -1,19 +1,37 @@
 # Ficha de caracterización: datos sintéticos
 
-Versión: 1.0. Fecha: 2026-11-13. Responsable: equipo del proyecto, pendiente de asignar.
+Versión: 1.1. Fecha: 2026-11-17. Responsable: equipo del proyecto.
 
-Esta ficha describe exclusivamente la ejecución previa del generador sintético, no la población de un hospital. Fuente: `src/data_layer/synthetic_data.py`; configuración predeterminada: semilla 42 y 1.200 pacientes generados, con duplicados y valores inválidos introducidos deliberadamente. La etiqueta 2023-S1 a 2024-S2 es simulada; no representa un período de atención real. Institución, autorización de uso y tipo específico de cáncer: no aplican a esta muestra sintética; pendientes de confirmar para datos reales.
+Esta ficha describe el lote sintético usado para entrenar el modelo actual, no la población de un hospital.
 
-| Indicador de la ejecución previa | Resultado |
+| Campo (sección VI-B del informe) | Valor |
+|---|---|
+| Institución o fuente | Generador sintético del prototipo (`src/data_layer/synthetic_data.py`, semilla 42) |
+| Archivo | `data/synthetic/pacientes_sinteticos_20000.csv`; SHA-256 `bf2078859176c2292618f8688944f8d14b2ab4688754c3bdd5ac87e4b2bc652a` |
+| Carga | Stage de Snowflake a `RAW.PACIENTES_PRUEBA_SINTETICOS` (`sql/01_ingesta_stage.sql`); copia local idéntica para trabajar sin conexión |
+| Período cubierto | Semestres simulados 2023-S1 a 2024-S2 (procedencia, no fechas de seguimiento) |
+| Tipo de enfermedad oncológica | No aplica: etiqueta simulada `riesgo_oncologico` |
+| Formato | CSV UTF-8, 15 columnas, una fila por paciente |
+| Registros iniciales | 20.000 |
+| Pacientes únicos | 20.000 |
+| Variables | 11 predictores, 2 metadatos (`fuente`, `periodo`), identificador y etiqueta (ver `diccionario_sintetico.md`) |
+| Proporción de clases | Clase 0: 15.012 (75,06 %); clase 1: 4.988 (24,94 %) |
+| Anonimización | Sin nombre ni documento en el archivo; identificador ficticio `PAC-xxxxx` |
+| Autorización de uso | No aplica (datos generados); pendiente para datos reales |
+
+## Flujo de selección
+
+| Etapa | Registros |
 |---|---:|
-| Registros en RAW | 1.212 |
-| Duplicados exactos detectados en RAW | 12 |
-| Edad fuera del intervalo 0–120 en RAW | 2 |
-| Registros en CLEAN y ANALYTICAL | 1.198 |
-| Identificadores repetidos en CLEAN | 0 |
-| Clase 0 en CLEAN | 908 (75,79 %) |
-| Clase 1 en CLEAN | 290 (24,21 %) |
+| RAW | 20.000 |
+| Duplicados exactos eliminados | 0 |
+| Valores clínicamente imposibles eliminados (edad, IMC) | 0 |
+| Registros sin variable objetivo eliminados | 0 |
+| CLEAN y ANALYTICAL | 20.000 |
+| Desarrollo / prueba reservada (agrupada por paciente) | 16.000 / 4.000 |
 
-La cantidad objetivo es una etiqueta simulada de clasificación binaria; no hay fecha índice, horizonte de seguimiento ni evento clínico futuro validado. La probabilidad del modelo solo describe la condición simulada. La creación sintética incorpora asociaciones definidas artificialmente, de modo que no puede inferirse una asociación clínica ni causal. La ficha debe actualizarse para cada nueva ejecución a partir de `reports/calidad_raw.json`, `reports/calidad_clean.json` y `reports/resumen_pipeline.json`; las cifras anteriores son de la ejecución previa a las correcciones.
+No hay valores faltantes. La revisión IQR señala atípicos plausibles que se conservan (`decisiones_modelado.md`, punto 3). Hay 3.567 registros con sexo M y paridad mayor que 0, producto de la simulación independiente de campos; se conservan y se señalan en el panel de calidad.
 
-En CLEAN se observaron faltantes en CA-125 (17,20 %), imagen (10,85 %), glucosa (10,18 %), presión (8,60 %) e IMC (4,09 %). La revisión IQR señala valores extremos potenciales, no errores demostrados. La imputación se ajusta dentro de la canalización de entrenamiento. El tratamiento en datos reales necesitará validación específica.
+La etiqueta es una clasificación binaria simulada, sin fecha índice, horizonte de seguimiento ni evento clínico futuro validado: la probabilidad del modelo describe solo la condición simulada. Esta ficha debe actualizarse en cada ejecución a partir de `reports/calidad_raw.json`, `reports/calidad_clean.json` y `reports/resumen_pipeline.json`.
+
+**Ejecución anterior (referencia).** La versión 1.0 de esta ficha describía un lote generado de 1.212 registros (12 duplicados y 2 edades inválidas eliminados, 1.198 en ANALYTICAL). Ese lote ya no se usa para entrenar; el generador se conserva para las pruebas de limpieza.

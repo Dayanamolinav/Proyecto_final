@@ -1,9 +1,11 @@
 """
 Capa de ingesta (Sección VII-A.2 y VII-B.2 del informe).
 
-En producción, esta etapa recibiría el archivo CSV entregado por el hospital
-universitario a través de un Stage de Snowflake [18]. En este prototipo, al
-no disponer todavía de ese archivo, `load_source_file()` admite tres modos:
+El archivo CSV entra a Snowflake por un Stage [18] con
+`scripts/cargar_csv_snowflake.py` (PUT + COPY INTO, ver sql/01_ingesta_stage.sql).
+En este prototipo, al no disponer todavía del archivo del hospital,
+`load_source_file()` admite cuatro modos (el cuarto, `use_local_synthetic_csv`,
+lee la copia local del mismo lote sintético para trabajar sin conexión):
 
   1. `csv_path`: deshabilitado hasta adaptar y autorizar el esquema del
      archivo real del hospital (ver el ValueError de abajo).
@@ -18,11 +20,12 @@ el informe.
 """
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 
 import pandas as pd
 
-from config import RAW_DIR, SyntheticDataConfig
+from config import LOCAL_SYNTHETIC_CSV, RAW_DIR, SyntheticDataConfig
 from src.data_layer.synthetic_data import generate_synthetic_clinical_data
 from src.data_layer.traceability import TraceEvent, log_event
 
@@ -31,8 +34,9 @@ def load_from_snowflake_csv_table(
     schema: str = "RAW", table: str = "PACIENTES_PRUEBA_SINTETICOS"
 ) -> tuple[pd.DataFrame, dict]:
     """Lee el CSV de 20.000 pacientes sintéticos ya cargado en Snowflake
-    (ver documentacion/subir_csv_a_snowflake.md), usando la misma conexión
-    configurada en snowflake_connection.py."""
+    mediante el Stage (sql/01_ingesta_stage.sql o
+    scripts/cargar_csv_snowflake.py), usando la misma conexión configurada
+    en snowflake_connection.py."""
     from src.data_layer.snowflake_connection import snowflake_connection
 
     with snowflake_connection() as conn:
@@ -59,10 +63,31 @@ def load_from_snowflake_csv_table(
     return df, metadata
 
 
+def load_local_synthetic_csv(path: str | Path | None = None) -> tuple[pd.DataFrame, dict]:
+    """Lee la copia local del mismo lote de 20.000 pacientes SINTÉTICOS que se
+    cargó a Snowflake por Stage (sql/01_ingesta_stage.sql). Permite reproducir
+    el entrenamiento sin conexión. No sirve para archivos reales: esos siguen
+    deshabilitados hasta aprobar su esquema y protección de identificadores."""
+    source = Path(path) if path is not None else LOCAL_SYNTHETIC_CSV
+    raw_bytes = source.read_bytes()
+    df = pd.read_csv(source, encoding="utf-8-sig", dtype={"id_paciente": "string"})
+    metadata = {
+        "origen": f"csv_sintetico_local:{source.name}",
+        "es_sintetico": True,
+        "sha256": hashlib.sha256(raw_bytes).hexdigest(),
+        "n_registros_iniciales": int(len(df)),
+        "n_columnas": int(df.shape[1]),
+        "columnas": list(df.columns),
+    }
+    log_event(TraceEvent(stage="INGESTA", action="carga_csv_sintetico_local", details=metadata, rows_affected=len(df)))
+    return df, metadata
+
+
 def load_source_file(
     csv_path: str | Path | None = None,
     synth_cfg: SyntheticDataConfig | None = None,
     use_snowflake_csv: bool = False,
+    use_local_synthetic_csv: bool = False,
 ) -> tuple[pd.DataFrame, dict]:
     """Ingiere el archivo fuente y devuelve (DataFrame, metadata_de_carga)."""
     if csv_path is not None:
@@ -70,6 +95,9 @@ def load_source_file(
             "La ingesta de CSV está deshabilitada hasta adaptar el esquema y "
             "la protección de identificadores al archivo autorizado del hospital."
         )
+
+    if use_local_synthetic_csv:
+        return load_local_synthetic_csv()
 
     if use_snowflake_csv:
         return load_from_snowflake_csv_table()

@@ -24,6 +24,8 @@ from sklearn.metrics import (
     average_precision_score,
 )
 
+from config import THRESHOLD_GRID
+
 
 def null_model_probabilities(y_train: pd.Series, n: int) -> np.ndarray:
     """Modelo nulo: asigna a todos los pacientes la prevalencia observada en
@@ -64,12 +66,40 @@ def compute_calibration_curve(y_true: np.ndarray, y_proba: np.ndarray, n_bins: i
     return {"prob_predicha": prob_pred.round(4).tolist(), "prob_observada": prob_true.round(4).tolist()}
 
 
-def evaluate_against_null_model(y_train: pd.Series, y_test: np.ndarray, y_proba_test: np.ndarray) -> dict:
+def select_threshold(y_dev: np.ndarray, oof_proba: np.ndarray, grid: list[float] | None = None) -> dict:
+    """Elige el umbral que maximiza F1 sobre las predicciones fuera de pliegue
+    del conjunto de DESARROLLO (nunca sobre la prueba reservada). En empate se
+    conserva el umbral más bajo, que favorece la sensibilidad. El umbral es una
+    decisión técnica del prototipo, no un punto de corte clínico."""
+    grid = THRESHOLD_GRID if grid is None else grid
+    y_dev = np.asarray(y_dev, dtype=int)
+    oof_proba = np.asarray(oof_proba, dtype=float)
+    if np.isnan(oof_proba).any():
+        raise ValueError("Faltan predicciones fuera de pliegue para elegir el umbral.")
+    scores = [(float(t), f1_score(y_dev, (oof_proba >= t).astype(int), zero_division=0)) for t in grid]
+    best_threshold, best_f1 = max(scores, key=lambda item: (item[1], -item[0]))
+    return {"umbral": round(best_threshold, 2), "criterio": "max_f1_fuera_de_pliegue_desarrollo", "f1_desarrollo": round(float(best_f1), 4)}
+
+
+def development_summary(y_dev: pd.Series, oof_proba: np.ndarray, threshold: float) -> dict:
+    """Métricas fuera de pliegue en desarrollo y su modelo nulo. Sirven para
+    justificar decisiones (umbral, calibración) sin consultar la prueba."""
+    y = y_dev.to_numpy(dtype=int)
+    null_proba = null_model_probabilities(y_dev, n=len(y))
+    model = compute_metrics(y, oof_proba, threshold=threshold)
+    null = compute_metrics(y, null_proba, threshold=threshold)
+    return {"modelo": model, "modelo_nulo": null, "brier_mejor_que_nulo": bool(model["brier_score"] < null["brier_score"])}
+
+
+def evaluate_against_null_model(
+    y_train: pd.Series, y_test: np.ndarray, y_proba_test: np.ndarray, threshold: float = 0.5
+) -> dict:
     """Contrasta el modelo evaluado contra el modelo nulo y contra el azar
-    (AUROC = 0.50), tal como exige la Hipótesis de investigación."""
+    (AUROC = 0.50), tal como exige la Hipótesis de investigación. El umbral
+    debe haberse elegido antes, con datos de desarrollo."""
     null_proba = null_model_probabilities(y_train, n=len(y_test))
-    model_metrics = compute_metrics(y_test, y_proba_test)
-    null_metrics = compute_metrics(y_test, null_proba)
+    model_metrics = compute_metrics(y_test, y_proba_test, threshold=threshold)
+    null_metrics = compute_metrics(y_test, null_proba, threshold=threshold)
 
     return {
         "modelo": model_metrics,

@@ -1,6 +1,15 @@
 [theme]
-primaryColor = "#0989b2"
-backgroundColor = "#ffffff"
-secondaryBackgroundColor = "#f2f7fa"
-textColor = "#173a55"
+primaryColor = "#2048ff"
+backgroundColor = "#f2f0eb"
+secondaryBackgroundColor = "#e8e5de"
+textColor = "#0d0f14"
 font = "sans serif"
+paddingTop = "0rem"
+paddingBottom = "0rem"
+
+[server]
+# Sirve app/static/ en /app/static/ (videos y fotos de la portada)
+enableStaticServing = true
+
+[client]
+toolbarMode = "minimal"

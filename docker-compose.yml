@@ -1,0 +1,17 @@
+# docker compose up --build   ->  http://localhost:8501
+# Si el puerto 8501 está ocupado:  ONCORISK_PORT=8502 docker compose up
+#   (PowerShell: $env:ONCORISK_PORT=8502; docker compose up)
+services:
+  oncorisk:
+    build: .
+    image: oncorisk:latest
+    ports:
+      - "${ONCORISK_PORT:-8501}:8501"
+    environment:
+      DATA_BACKEND: local
+    # Opcional: variables de Snowflake y ADMIN_PANEL_CODE. Sin ADMIN_PANEL_CODE,
+    # el panel de administración queda abierto para cualquiera que abra la página.
+    env_file:
+      - path: .env
+        required: false
+    restart: unless-stopped
