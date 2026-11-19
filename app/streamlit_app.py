@@ -10,16 +10,11 @@ import joblib
 import pandas as pd
 import streamlit as st
 
-<<<<<<< HEAD
-=======
-import os
-from src.pipeline import run_full_pipeline  # noqa: E402
-
->>>>>>> 00e19cf546b21c5570e600468f7a8d417360b312
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from config import MODELS_DIR  # noqa: E402
 from src.modeling.explain import explain_model  # noqa: E402
 from src.processing.input_validation import prepare_patient_input  # noqa: E402
+from app.statistics_panel import render_statistics_panel, VARIABLE_LABELS, category  # noqa: E402
 
 APP_DIR = Path(__file__).resolve().parent
 MODEL_PATH = MODELS_DIR / "modelo_seleccionado.joblib"
@@ -33,6 +28,8 @@ def asset_uri(name: str, mime: str) -> str:
 
 
 def markup(content: str):
+    if st.query_params.get("vista") == "estadisticas":
+        content = content.replace('href="#', 'href="?#')
     st.markdown(content, unsafe_allow_html=True)
 
 
@@ -52,60 +49,7 @@ def load_model_bundle():
         return None
     return joblib.load(MODEL_PATH)
 
-<<<<<<< HEAD
 
-=======
-def render_admin_panel():
-    with st.expander("⚙️ Panel de administración — actualizar el modelo", expanded=False):
-        codigo_esperado = os.getenv("ADMIN_PANEL_CODE", "")
-        if not codigo_esperado:
-            st.caption("No hay código configurado (ADMIN_PANEL_CODE en tu .env) — este panel queda abierto.")
-        else:
-            ingresado = st.text_input("Código de administrador", type="password", key="admin_code_input")
-            if ingresado != codigo_esperado:
-                if ingresado:
-                    st.error("Código incorrecto.")
-                else:
-                    st.caption("Ingresa el código de administrador para desbloquear esta sección.")
-                return
-
-        st.caption("Vuelve a entrenar el modelo sin usar la terminal.")
-        fuente = st.radio(
-            "Fuente de datos",
-            ["Snowflake (20.000 pacientes)", "Generar lote local pequeño"],
-            index=0,
-            key="admin_fuente",
-        )
-        password = ""
-        if fuente.startswith("Snowflake"):
-            password = st.text_input(
-                "Contraseña de Snowflake", type="password", key="admin_password",
-                help="No se guarda; solo se usa para esta actualización.",
-            )
-        if st.button("Entrenar / actualizar modelo", use_container_width=True, key="admin_entrenar"):
-            if fuente.startswith("Snowflake") and not password:
-                st.error("Ingresa la contraseña de Snowflake.")
-                return
-            if password:
-                os.environ["SNOWFLAKE_PASSWORD"] = password
-            with st.spinner("Entrenando modelo... puede tardar uno o dos minutos."):
-                try:
-                    summary = run_full_pipeline(
-                        backend="snowflake",
-                        use_snowflake_csv=fuente.startswith("Snowflake"),
-                    )
-                except Exception as exc:
-                    st.error(f"No se pudo entrenar: {exc}")
-                    return
-            load_model_bundle.clear()
-            ev = summary["evaluacion_prueba_reservada"]["modelo"]
-            st.success(
-                f"Modelo actualizado: {summary['modelo_seleccionado']} "
-                f"(AUROC {ev['auroc']:.3f})"
-            )
-            st.rerun()
-            
->>>>>>> 00e19cf546b21c5570e600468f7a8d417360b312
 def render_header():
     logo = asset_uri("brand.svg", "image/svg+xml")
     markup(f'''
@@ -113,7 +57,7 @@ def render_header():
     <div class="utility-bar"><div class="utility-inner"><span>Investigación en salud · Universidad del Norte</span><span>Entorno académico &nbsp; / &nbsp; Datos sintéticos</span></div></div>
     <header class="site-header">
       <a class="brand" href="#inicio" target="_self" aria-label="OncoRisk, inicio"><img class="brand-mark" src="{logo}" alt=""/><span><span class="brand-name">Onco<span>Risk</span></span><span class="brand-tagline">INVESTIGACIÓN Y ANÁLISIS</span></span></a>
-      <nav class="nav-links" aria-label="Navegación principal"><a href="#inicio" target="_self">INICIO</a><a href="#proyecto" target="_self">EL PROYECTO</a><a href="#herramientas" target="_self">HERRAMIENTAS</a><a href="#modelo" target="_self">EL MODELO</a><a class="nav-cta" href="#explorar" target="_self">Iniciar exploración &nbsp; ↗</a></nav>
+      <nav class="nav-links" aria-label="Navegación principal"><a href="?#inicio" target="_self">INICIO</a><a href="?#proyecto" target="_self">EL PROYECTO</a><a href="?#herramientas" target="_self">HERRAMIENTAS</a><a href="?vista=estadisticas" target="_self">ANÁLISIS ESTADÍSTICO</a><a class="nav-cta" href="?#explorar" target="_self">Exploración individual &nbsp; ↗</a></nav>
     </header>''')
 
 
@@ -129,10 +73,10 @@ def render_hero():
 def render_services():
     cards = [
         ("profile", "Exploración individual", "Configura las variables de un caso de ejemplo y consulta la estimación del modelo sintético.", "explorar", "Explorar variables"),
-        ("chart", "Resultados comprensibles", "Consulta la probabilidad estimada y conoce el alcance de cada resultado de la demostración.", "resultado", "Ver resultados"),
+        ("chart", "Análisis estadístico", "Explora distribuciones, comparaciones, correlaciones y estimaciones de los 20.000 pacientes sintéticos.", "?vista=estadisticas", "Abrir panel estadístico"),
         ("research", "Investigación transparente", "Revisa las variables del modelo y sus métricas de evaluación en la prueba sintética.", "modelo", "Conocer el modelo"),
     ]
-    rendered = "".join(f'<article class="service-card"><span class="service-icon">{icon(i)}</span><h3>{title}</h3><p>{copy}</p><a href="#{anchor}" target="_self">{label} &nbsp; →</a></article>' for i, title, copy, anchor, label in cards)
+    rendered = "".join(f'<article class="service-card"><span class="service-icon">{icon(i)}</span><h3>{title}</h3><p>{copy}</p><a href="{anchor if anchor.startswith(chr(63)) else chr(35)+anchor}" target="_self">{label} &nbsp; →</a></article>' for i, title, copy, anchor, label in cards)
     markup(f'<section id="herramientas" class="content-width section-anchor"><div class="section-heading"><span class="eyebrow">UN ESPACIO PARA EXPLORAR</span><h2>La información, más cerca de ti</h2><p>Tres formas de acercarte al análisis y comprender cada paso.</p></div><div class="service-grid">{rendered}</div></section>')
 
 
@@ -189,7 +133,19 @@ def render_prediction(bundle: dict, patient_df: pd.DataFrame):
     with right:
         markup('<div class="panel result-card"><h3>¿Cómo leer este resultado?</h3><p>Es una probabilidad de clasificación de una condición simulada. No representa el riesgo futuro de una persona y no se han establecido umbrales clínicos para esta salida.</p></div>')
     with st.expander("Consultar los valores utilizados en el cálculo"):
-        st.dataframe(patient_df, use_container_width=True, hide_index=True)
+        st.dataframe(patient_df.rename(columns=VARIABLE_LABELS), width="stretch", hide_index=True)
+
+
+def readable_feature(name: str) -> str:
+    """Traduce también las columnas codificadas que expone el modelo."""
+    feature = name.split("__", 1)[-1]
+    for original in sorted(VARIABLE_LABELS, key=len, reverse=True):
+        if feature == original:
+            return VARIABLE_LABELS[original]
+        if feature.startswith(original + "_"):
+            value = feature[len(original) + 1:]
+            return f"{VARIABLE_LABELS[original]}: {category(value, original)}"
+    return feature.replace("_", " ")
 
 
 def render_interpretation(bundle: dict):
@@ -198,6 +154,7 @@ def render_interpretation(bundle: dict):
     with st.expander("Variables con mayor contribución global", expanded=False):
         st.write("Describen el comportamiento general del modelo. No explican por sí solas un resultado individual ni indican causalidad.")
         explanation = explain_model(bundle["pipeline"], top_n=10)
+        explanation["variable"] = explanation["variable"].map(readable_feature)
         value_column = explanation.columns[1]
         st.vega_lite_chart(explanation, {
             "mark": {"type": "bar", "cornerRadiusEnd": 4, "color": "#168eb5"},
@@ -208,8 +165,8 @@ def render_interpretation(bundle: dict):
             },
             "height": 300,
             "config": {"view": {"stroke": None}, "axis": {"labelColor": "#42586d", "titleColor": "#42586d"}},
-        }, use_container_width=True)
-        st.dataframe(explanation, use_container_width=True, hide_index=True)
+        }, width="stretch")
+        st.dataframe(explanation.rename(columns={"variable": "Variable", "coeficiente (log-odds)": "Coeficiente (log-momios)", "importancia_relativa": "Importancia relativa"}), width="stretch", hide_index=True)
     with st.expander("Ver desempeño en la prueba sintética", expanded=False):
         ev, ref = bundle["evaluation"]["modelo"], bundle["evaluation"]["modelo_nulo"]
         a, b, c, d = st.columns(4)
@@ -235,6 +192,10 @@ def main():
     markup(f"<style>{(APP_DIR / 'portal.css').read_text(encoding='utf-8')}</style>")
     bundle = load_model_bundle()
     render_header()
+    if st.query_params.get("vista") == "estadisticas":
+        render_statistics_panel(bundle)
+        render_footer()
+        return
     render_hero()
     render_services()
     render_project()
@@ -261,10 +222,6 @@ def main():
         else:
             st.caption("La interpretación y las métricas estarán disponibles después de generar el modelo.")
     render_workflow()
-<<<<<<< HEAD
-=======
-    render_admin_panel()
->>>>>>> 00e19cf546b21c5570e600468f7a8d417360b312
     render_footer()
 
 

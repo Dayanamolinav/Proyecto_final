@@ -8,6 +8,21 @@
   --line: #deebf0;
   --pale: #f3f9fb;
 }
+.st-key-statistics-section { width: min(1280px, calc(100% - 56px)); margin: 0 auto; padding: 42px 0 56px; }
+.statistics-heading h1 { font-size: clamp(26px, 3vw, 38px); color: #123958; margin: 0 0 12px; }
+.statistics-heading p { color: #607d8f; font-size: 15px; }
+.st-key-statistics-section h4 { font-size: 18px; color: #234c67; margin-top: 20px; }
+.st-key-statistics-section [data-testid="stMetric"] { min-height: 116px; }
+.st-key-statistics-section [data-testid="stMetricValue"] { font-size: 26px; }
+.st-key-statistics-section [data-testid="stVegaLiteChart"] { background: #fff; padding: 10px 0; }
+.st-key-statistics-section [data-testid="stSegmentedControl"] { flex-wrap: wrap; gap: 8px; margin: 18px 0; }
+.st-key-statistics-section [data-testid="stButtonGroup"] { flex-wrap: wrap; gap: 8px; }
+.st-key-statistics-section [data-testid="stDataFrame"] { max-width: 100%; }
+@media (max-width: 780px) {
+  .st-key-statistics-section { width: calc(100% - 32px); padding-top: 28px; }
+  .st-key-statistics-section [data-testid="stHorizontalBlock"] { flex-wrap: wrap; }
+  .st-key-statistics-section [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] { min-width: min(280px, 100%) !important; flex: 1 1 100% !important; }
+}
 html { scroll-behavior: smooth; scroll-padding-top: 100px; }
 html, body, [data-testid="stAppViewContainer"], button, input, select, textarea {
   font-family: "Segoe UI", Arial, sans-serif;

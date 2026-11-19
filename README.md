@@ -4,6 +4,12 @@ Este proyecto demuestra una canalización de ingeniería de datos y aprendizaje 
 
 ## Preparación y ejecución
 
+## Panel de Análisis Estadístico e Inferencial
+
+Esta versión incluye una sección independiente accesible desde el menú **Análisis estadístico**, con el CSV de 20.000 pacientes sintéticos ya incorporado para exploración. Sus ocho vistas cubren demografía, distribuciones/KDE/violines, correlaciones, contrastes y OR, semestres, PCA/K-means, evaluación del modelo y calidad/descargas. Véase `documentacion/analisis_estadistico.md` para fórmulas, procedencia y límites. El panel no reentrena el modelo ni migra el almacenamiento a Snowflake.
+
+### Iniciar la aplicación
+
 Esta copia incluye el portal institucional inspirado en el video de referencia del 16 de noviembre de 2026: navegación superior, portada azul y turquesa, accesos por sección, formulario y resultados. Conserva los módulos de procesamiento, entrenamiento, validación y conexión a Snowflake de la versión anterior. El rediseño no cambia la fuente de datos ni conecta automáticamente Snowflake.
 
 El archivo de entrada de la página es `app/streamlit_app.py` (no `app.py`). Consulta `documentacion/redisenio_portal.md` para ver los cambios y las comprobaciones.
