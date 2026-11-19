@@ -6,7 +6,7 @@ universitario a través de un Stage de Snowflake [18]. En este prototipo, al
 no disponer todavía de ese archivo, `load_source_file()` admite dos modos:
 
   1. Si se indica `csv_path`, se ingiere ese archivo CSV real (así, cuando el
-     hospital entregue los datos, basta con apuntar a ese archivo).
+     hospital entregue los datos, debe adaptarse y autorizarse antes de habilitar su carga).
   2. Si no se indica ninguno, se genera el conjunto sintético de prueba
      (`generate_synthetic_clinical_data`) y se persiste como si fuera el
      archivo recién cargado, dejando constancia en la bitácora de que el
@@ -29,10 +29,10 @@ from src.data_layer.traceability import TraceEvent, log_event
 def load_source_file(csv_path: str | Path | None = None, synth_cfg: SyntheticDataConfig | None = None) -> tuple[pd.DataFrame, dict]:
     """Ingiere el archivo fuente y devuelve (DataFrame, metadata_de_carga)."""
     if csv_path is not None:
-        csv_path = Path(csv_path)
-        df = pd.read_csv(csv_path)
-        source_label = f"archivo_real:{csv_path.name}"
-        is_synthetic = False
+        raise ValueError(
+            "La ingesta de CSV está deshabilitada hasta adaptar el esquema y "
+            "la protección de identificadores al archivo autorizado del hospital."
+        )
     else:
         df = generate_synthetic_clinical_data(synth_cfg)
         source_label = "generador_sintetico_pruebas"
@@ -63,8 +63,8 @@ def persist_raw(df: pd.DataFrame, filename: str = "clinical_raw.parquet") -> Pat
     RAW conserva los datos como fueron recibidos, UNA VEZ retirados o
     sustituidos los identificadores personales directos (ver Sección VII-B.3:
     "en RAW se conservarán los datos recibidos sin identificadores personales
-    directos"). Aquí sustituimos esos identificadores por un hash
-    seudonimizado antes de escribir en RAW.
+    directos"). Aquí eliminamos los identificadores configurados
+    antes de escribir en RAW.
     """
     from src.data_layer.storage import pseudonymize_direct_identifiers
 

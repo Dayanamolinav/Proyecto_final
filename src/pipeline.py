@@ -70,8 +70,8 @@ def run_full_pipeline(
 
     # --- Registro de experimentos para cada modelo candidato --------------------
     for name, result in cv_results.items():
-        y_proba_this = result["pipeline"].predict_proba(split.X_test)[:, 1]
-        test_metrics = evaluate_against_null_model(split.y_train, split.y_test.to_numpy(), y_proba_this)["modelo"]
+
+        test_metrics = evaluation["modelo"] if name == best_name else {}
         record = ExperimentRecord(
             model_name=name,
             random_seed=42,
@@ -108,7 +108,7 @@ def run_full_pipeline(
         "resultados_validacion_cruzada": {k: {"cv_mean": v["cv_mean"], "cv_std": v["cv_std"]} for k, v in cv_results.items()},
         "evaluacion_prueba_reservada": evaluation,
         "variables_mas_influyentes": feature_importance.to_dict(orient="records"),
-        "ruta_modelo": str(model_path),
+        "ruta_modelo": str(Path("models") / model_path.name),
         "n_analytical": len(analytical_df),
     }
 

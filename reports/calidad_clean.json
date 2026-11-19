@@ -1,7 +1,7 @@
 {
   "etapa": "CLEAN",
   "n_registros": 1198,
-  "n_columnas": 17,
+  "n_columnas": 15,
   "completitud": {
     "proporcion_faltantes_por_columna": {
       "ca125_u_ml": 0.172,
@@ -9,10 +9,8 @@
       "glucosa_mg_dl": 0.1018,
       "presion_sistolica": 0.086,
       "imc": 0.0409,
-      "id_paciente": 0.0,
-      "nombre": 0.0,
       "edad": 0.0,
-      "documento_identidad": 0.0,
+      "id_paciente": 0.0,
       "tabaquismo": 0.0,
       "antecedente_personal_benigno": 0.0,
       "antecedente_familiar_cancer": 0.0,

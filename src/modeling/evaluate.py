@@ -74,6 +74,7 @@ def evaluate_against_null_model(y_train: pd.Series, y_test: np.ndarray, y_proba_
     return {
         "modelo": model_metrics,
         "modelo_nulo": null_metrics,
+        "curva_calibracion": compute_calibration_curve(y_test, y_proba_test),
         "supera_azar_auroc_mayor_0_50": bool(model_metrics["auroc"] > 0.50),
         "brier_mejor_que_nulo": bool(model_metrics["brier_score"] < null_metrics["brier_score"]),
     }

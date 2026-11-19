@@ -1,0 +1,10 @@
+# Preparación para datos reales
+
+Versión 1.0; fecha 2026-11-13. Responsable: equipo del proyecto, pendiente de asignar. La ejecución actual usa datos sintéticos. El CSV real y Snowflake están fuera del alcance inmediato; esta lista no representa trabajo ya realizado.
+
+1. Obtener la fuente autorizada y acordar con el hospital la finalidad, acceso, custodia, retención y procedimiento de retiro o sustitución de identificadores antes de cargar los datos. La eliminación de los dos identificadores sintéticos configurados no garantiza que se eliminen todos los identificadores de un archivo real; el CSV permanece deshabilitado hasta adaptar el esquema.
+2. Completar ficha de caracterización y diccionario: período, unidad de análisis, pacientes únicos, naturaleza de cada columna, categorías y unidades, fuente y permisos. Establecer criterios y registrar exclusiones, calidad y faltantes sin divulgar registros individuales.
+3. Definir tipo de cáncer, desenlace, fecha índice, disponibilidad de predictores y horizonte de seguimiento antes del modelado. Sin evento futuro y seguimiento válidos, denominar la salida probabilidad de clasificación; no riesgo futuro. Revisar con expertos cualquier variable que pueda revelar el resultado o ser posterior al evento.
+4. Adaptar el mapeo y las reglas al esquema real. El argumento `--csv` por sí solo no garantiza compatibilidad: el código actual asume columnas y categorías concretas. Revisar reglas de limpieza, rangos, imputación, tamaños de clase y casos repetidos; confirmar que la partición por paciente y la validación temporal sean adecuadas.
+5. Reentrenar y seleccionar con datos de desarrollo, reservar la prueba para evaluación final del modelo elegido, analizar discriminación y calibración, y documentar incertidumbre y limitaciones. Repetir las pruebas funcionales y registrar resultados sin identificar personas.
+6. Al retomar Snowflake, definir el diseño de capas, permisos, carga, gobernanza y conectividad, y comprobar con datos de prueba antes de transferir datos sensibles. No almacenar credenciales en código ni repositorio.

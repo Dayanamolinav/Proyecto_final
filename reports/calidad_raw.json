@@ -1,7 +1,7 @@
 {
   "etapa": "RAW",
   "n_registros": 1212,
-  "n_columnas": 20,
+  "n_columnas": 18,
   "completitud": {
     "proporcion_faltantes_por_columna": {
       "fecha_diagnostico_confirmado": 1.0,
@@ -10,10 +10,8 @@
       "glucosa_mg_dl": 0.1007,
       "presion_sistolica": 0.0858,
       "imc": 0.0404,
-      "nombre": 0.0,
-      "id_paciente": 0.0,
       "edad": 0.0,
-      "documento_identidad": 0.0,
+      "id_paciente": 0.0,
       "tabaquismo": 0.0,
       "sexo": 0.0,
       "paridad": 0.0,

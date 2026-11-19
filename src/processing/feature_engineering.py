@@ -19,6 +19,7 @@ from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
 from config import PATIENT_ID_COLUMN, TARGET_COLUMN
 from src.data_layer.traceability import TraceEvent, log_event
+from src.processing.derived_variables import derive_variables
 
 # Columnas de metadata/procedencia que no son predictoras del riesgo y no
 # deben entrar al modelo (se conservan en ANALYTICAL solo para trazabilidad).
@@ -44,19 +45,7 @@ CATEGORICAL_FEATURES = [
 def add_derived_variables(df: pd.DataFrame) -> pd.DataFrame:
     """Agrega variables derivadas simples, pertinentes al problema, a partir
     de información ya disponible (sin usar el desenlace)."""
-    df = df.copy()
-    if "imc" in df.columns:
-        df["imc_categoria"] = pd.cut(
-            df["imc"],
-            bins=[0, 18.5, 25, 30, 100],
-            labels=["bajo_peso", "normal", "sobrepeso", "obesidad"],
-        ).astype(str)
-    if "edad" in df.columns:
-        df["grupo_etario"] = pd.cut(
-            df["edad"],
-            bins=[0, 40, 55, 70, 120],
-            labels=["<40", "40-54", "55-69", "70+"],
-        ).astype(str)
+    df = derive_variables(df)
     log_event(
         TraceEvent(
             stage="ANALYTICAL",

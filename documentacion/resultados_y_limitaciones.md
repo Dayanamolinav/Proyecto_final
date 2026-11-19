@@ -1,0 +1,7 @@
+# Resultados y limitaciones de la ejecución sintética
+
+Fecha: 2026-11-13. Responsable: Codex. Fuente: `reports/resumen_pipeline.json` de la versión corregida. La muestra fue generada artificialmente y no representa pacientes del hospital.
+
+Con 1.198 registros analíticos se seleccionó regresión logística con AUROC medio de validación cruzada de 0,7137; Random Forest obtuvo 0,7124 y XGBoost 0,6899. En la prueba reservada, la regresión logística obtuvo AUROC 0,5864, precisión promedio 0,3682, sensibilidad 0,4483, especificidad 0,6538, F1 0,3537 y Brier 0,2400. El Brier del modelo nulo fue 0,1833: el modelo no lo superó en esa medida. El umbral de 0,5 es técnico y no está validado clínicamente.
+
+El generador impone relaciones artificiales entre predictores y etiqueta, por lo que las importancias no son evidencia clínica ni causal. No se dispone de validación externa, horizonte prospectivo, datos reales ni evaluación clínica. La precisión promedio se identifica como PR-AUC en el código y puede diferir del área trapezoidal de la curva precisión-recall. Revisar la calibración, incertidumbre, estrategia temporal y selección del modelo cuando existan datos reales. No utilizar el modelo para diagnóstico, tratamiento ni decisiones clínicas.

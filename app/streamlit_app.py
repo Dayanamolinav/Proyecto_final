@@ -32,6 +32,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from config import MODELS_DIR, REPORTS_DIR  # noqa: E402
 from src.modeling.explain import explain_model  # noqa: E402
+from src.processing.input_validation import prepare_patient_input  # noqa: E402
 
 MODEL_PATH = MODELS_DIR / "modelo_seleccionado.joblib"
 
@@ -51,7 +52,7 @@ def render_header():
         "Universidad del Norte · Ingeniería de datos e inteligencia artificial aplicada a información clínica"
     )
     st.warning(
-        "**Alcance académico y experimental.** Esta aplicación es un prototipo construido con "
+        "⚠️ **Alcance académico y experimental.** Esta aplicación es un prototipo construido con "
         "**datos sintéticos de prueba** (el conjunto real del hospital universitario aún no ha sido "
         "entregado). La salida es una **estimación probabilística**, no un diagnóstico, y **no reemplaza "
         "la valoración de un profesional de la salud**, conforme a la Sección VI-E del informe del proyecto.",
@@ -123,15 +124,11 @@ def patient_input_form() -> pd.DataFrame | None:
         "tabaquismo": tabaquismo,
         "resultado_imagen": resultado_imagen,
     }
-    # Variables derivadas, construidas exactamente como en feature_engineering.add_derived_variables
-    df = pd.DataFrame([row])
-    df["imc_categoria"] = pd.cut(
-        df["imc"], bins=[0, 18.5, 25, 30, 100], labels=["bajo_peso", "normal", "sobrepeso", "obesidad"]
-    ).astype(str)
-    df["grupo_etario"] = pd.cut(
-        df["edad"], bins=[0, 40, 55, 70, 120], labels=["<40", "40-54", "55-69", "70+"]
-    ).astype(str)
-    return df
+    try:
+        return prepare_patient_input(row)
+    except ValueError as exc:
+        st.error(f"Entrada inválida: {exc}")
+        return None
 
 
 def render_prediction(bundle: dict, patient_df: pd.DataFrame):
@@ -145,15 +142,13 @@ def render_prediction(bundle: dict, patient_df: pd.DataFrame):
     c1, c2 = st.columns([1, 2])
     with c1:
         st.metric("Probabilidad estimada", f"{proba:.1%}")
-        nivel = "Alta" if proba >= 0.5 else ("Intermedia" if proba >= 0.25 else "Baja")
         st.progress(min(max(proba, 0.0), 1.0))
-        st.write(f"Nivel orientativo: **{nivel}**")
     with c2:
         st.info(
             "Esta probabilidad corresponde a una **clasificación probabilística de la condición "
             "registrada** en los datos de entrenamiento (no se confirma temporalidad ni horizonte de "
             "predicción con el conjunto sintético actual), consistente con la Sección V-C del informe. "
-            "El umbral de 0.5 es orientativo y fue definido con datos de desarrollo, no con criterio clínico."
+            "No se han establecido umbrales clínicos para esta salida."
         )
 
     st.subheader("3. Variables con mayor contribución predictiva en el modelo")

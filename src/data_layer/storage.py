@@ -14,7 +14,7 @@ resto de la canalización.
 """
 from __future__ import annotations
 
-import hashlib
+
 from pathlib import Path
 
 import pandas as pd
@@ -27,25 +27,20 @@ _LAYER_DIRS = {"raw": RAW_DIR, "clean": CLEAN_DIR, "analytical": ANALYTICAL_DIR}
 def pseudonymize_direct_identifiers(
     df: pd.DataFrame, columns: list[str] | None = None
 ) -> tuple[pd.DataFrame, dict]:
-    """Reemplaza identificadores directos por un hash irreversible corto.
+    """Elimina los identificadores directos configurados antes de guardar RAW.
 
-    Esto habilita trazabilidad (mismo paciente -> mismo seudónimo) sin
+    La identificación de pacientes requiere una estrategia específica sin
     exponer el dato original, en línea con la Sección E ("Antes de cargar los
     datos ... se eliminarán o sustituirán los identificadores personales
     directos").
     """
-    columns = columns or DIRECT_IDENTIFIERS
+    # El prototipo no necesita conservar identificadores directos. Eliminarlos
+    # evita presentar hashes sin clave como una protección suficiente.
+    columns = DIRECT_IDENTIFIERS if columns is None else columns
     df = df.copy()
-    affected = []
-    for col in columns:
-        if col in df.columns:
-            df[col] = df[col].astype(str).map(
-                lambda v: hashlib.sha256(v.encode("utf-8")).hexdigest()[:12]
-            )
-            affected.append(col)
-    report = {"columnas_seudonimizadas": affected}
-    return df, report
-
+    affected = [col for col in columns if col in df.columns]
+    df = df.drop(columns=affected)
+    return df, {"columnas_eliminadas": affected}
 
 def write_layer(df: pd.DataFrame, layer: str, filename: str) -> Path:
     if layer not in _LAYER_DIRS:
