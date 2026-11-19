@@ -1,6 +1,8 @@
-"""Interfaz académica de demostración con datos sintéticos."""
+"""Portal académico OncoRisk. Presentación institucional y modelo sintético."""
 from __future__ import annotations
 
+import base64
+import html
 import sys
 from pathlib import Path
 
@@ -8,50 +10,38 @@ import joblib
 import pandas as pd
 import streamlit as st
 
+import os
+from src.pipeline import run_full_pipeline  # noqa: E402
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from config import MODELS_DIR  # noqa: E402
 from src.modeling.explain import explain_model  # noqa: E402
 from src.processing.input_validation import prepare_patient_input  # noqa: E402
 
+APP_DIR = Path(__file__).resolve().parent
 MODEL_PATH = MODELS_DIR / "modelo_seleccionado.joblib"
-st.set_page_config(page_title="OncoRisk | Laboratorio analítico", page_icon="◈", layout="wide", initial_sidebar_state="expanded")
+MODEL_NAMES = {"logistic_regression": "Regresión logística", "random_forest": "Random Forest", "xgboost": "XGBoost"}
+st.set_page_config(page_title="OncoRisk | Investigación y análisis oncológico", page_icon="◈", layout="wide")
 
-STYLE = """
-<style>
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap');
-:root { --ink: #122b43; --muted: #596f82; --teal: #087b78; --line: #dce7eb; }
-html, body, [class*="css"], [data-testid="stAppViewContainer"] { font-family: 'DM Sans', sans-serif; }
-[data-testid="stAppViewContainer"] { background: #f5f8f9; color: var(--ink); }
-[data-testid="stHeader"] { background: #f5f8f9; }
-[data-testid="stSidebar"] { background: #102b3a; }
-[data-testid="stSidebar"] *, [data-testid="stSidebar"] p { color: #e8f4f3; }
-[data-testid="stSidebar"] hr { border-color: #375260; }
-.block-container { max-width: 1300px; padding-top: 2.1rem; padding-bottom: 4rem; }
-h1,h2,h3 { font-family: 'Manrope', sans-serif; letter-spacing: -0.035em; color: var(--ink); }
-h1 { font-size: clamp(2.15rem, 4vw, 3.15rem) !important; line-height: 1.1 !important; }
-h3 { font-size: 1.15rem !important; }
-p, label { color: #304b60; }
-.eyebrow { display:inline-block; color:#087b78; background:#e1f3f1; border:1px solid #c9e9e5; border-radius:100px; padding:6px 12px; font-size:.72rem; letter-spacing:.11em; font-weight:800; text-transform:uppercase; margin-bottom: .8rem; }
-.hero-copy { max-width: 680px; font-size:1.04rem; line-height:1.7; color:#586f80; margin: 0 0 1.1rem; }
-.notice { padding: 14px 18px; background:#fff9e9; border:1px solid #f0dfac; border-left:4px solid #d79f30; border-radius:10px; color:#66531f; line-height:1.5; font-size:.91rem; margin: 1rem 0 1.6rem; }
-.sidebar-brand { font-family: 'Manrope', sans-serif; font-size:1.45rem; letter-spacing:-.04em; font-weight:800; color:white; }
-.sidebar-brand span { color:#68d3c4; }
-.sidebar-caption { color:#a8c3c8; font-size:.78rem; line-height:1.55; margin-top:.35rem; }
-.section-kicker { color:#087b78; font-size:.72rem; font-weight:800; letter-spacing:.11em; text-transform:uppercase; margin-top:1.2rem; }
-.section-note { color:#647b8c; font-size:.9rem; margin:-.3rem 0 1rem; line-height:1.5; }
-.panel { background:#fff; border:1px solid #dce8eb; border-radius:14px; padding:1rem 1.15rem; margin: .5rem 0 1rem; }
-.panel p { margin:0; font-size:.9rem; line-height:1.6; }
-[data-testid="stForm"] { background:#fff; border:1px solid #dce8eb; border-radius:16px; padding:1.45rem 1.55rem; box-shadow:0 5px 18px rgba(21,48,65,.035); }
-[data-testid="stForm"] h3 { margin-bottom:.3rem; }
-[data-testid="stMetric"] { background:#fff; border:1px solid #dce8eb; border-radius:12px; padding:1rem; }
-[data-testid="stMetricValue"] { color:#0b7773; font-weight:700; }
-.stButton > button, [data-testid="stFormSubmitButton"] button { border-radius:9px; min-height:2.8rem; font-weight:700; }
-[data-testid="stFormSubmitButton"] button p { color: #ffffff; }
-[data-testid="stExpander"] { background:#fff; border:1px solid #dce8eb; border-radius:12px; }
-.footer { margin-top:3rem; padding-top:1.25rem; border-top:1px solid #dce7eb; color:#718593; font-size:.78rem; }
-@media (max-width: 768px) { .block-container { padding-top: 1rem; } [data-testid="stForm"] { padding:1rem; } }
-</style>
-"""
+
+def asset_uri(name: str, mime: str) -> str:
+    data = (APP_DIR / "assets" / name).read_bytes()
+    return f"data:{mime};base64,{base64.b64encode(data).decode('ascii')}"
+
+
+def markup(content: str):
+    st.markdown(content, unsafe_allow_html=True)
+
+
+def icon(name: str) -> str:
+    paths = {
+        "profile": '<circle cx="24" cy="16" r="7"/><path d="M10 40v-4a14 14 0 0 1 28 0v4M18 36h12M24 30v12"/>',
+        "chart": '<path d="M8 8v32h34M16 30l8-10 8 5 10-15M16 38v-5M26 38v-9M36 38V22"/>',
+        "research": '<path d="M19 7h10M22 7v13L10 37a4 4 0 0 0 3 6h22a4 4 0 0 0 3-6L26 20V7M16 30h16M21 35h.1M28 38h.1"/>',
+        "shield": '<path d="M24 5 8 12v12c0 10 16 19 16 19s16-9 16-19V12ZM16 24l6 6 11-12"/>',
+    }
+    return f'<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{paths[name]}</svg>'
+
 
 @st.cache_resource(show_spinner=False)
 def load_model_bundle():
@@ -59,28 +49,92 @@ def load_model_bundle():
         return None
     return joblib.load(MODEL_PATH)
 
+def render_admin_panel():
+    with st.expander("⚙️ Panel de administración — actualizar el modelo", expanded=False):
+        codigo_esperado = os.getenv("ADMIN_PANEL_CODE", "")
+        if not codigo_esperado:
+            st.caption("No hay código configurado (ADMIN_PANEL_CODE en tu .env) — este panel queda abierto.")
+        else:
+            ingresado = st.text_input("Código de administrador", type="password", key="admin_code_input")
+            if ingresado != codigo_esperado:
+                if ingresado:
+                    st.error("Código incorrecto.")
+                else:
+                    st.caption("Ingresa el código de administrador para desbloquear esta sección.")
+                return
 
-def sidebar(bundle):
-    with st.sidebar:
-        st.markdown('<div class="sidebar-brand">◈ &nbsp;Onco<span>Risk</span></div><div class="sidebar-caption">LABORATORIO ANALÍTICO<br>Universidad del Norte</div>', unsafe_allow_html=True)
-        st.divider()
-        st.markdown("**Panel de investigación**")
-        st.caption("Prototipo experimental · Datos sintéticos")
-        st.markdown("**01** &nbsp; Ingreso de variables  \n**02** &nbsp; Resultado del modelo  \n**03** &nbsp; Interpretación global")
-        st.divider()
-        if bundle:
-            names = {"logistic_regression":"Regresión logística", "random_forest":"Random Forest", "xgboost":"XGBoost"}
-            st.caption("MODELO SELECCIONADO")
-            st.markdown(f"**{names.get(bundle['model_name'], bundle['model_name'])}**")
-            st.caption("Validación interna con datos sintéticos")
-        st.divider()
-        st.caption("Herramienta académica. No usar para diagnóstico ni decisiones clínicas.")
+        st.caption("Vuelve a entrenar el modelo sin usar la terminal.")
+        fuente = st.radio(
+            "Fuente de datos",
+            ["Snowflake (20.000 pacientes)", "Generar lote local pequeño"],
+            index=0,
+            key="admin_fuente",
+        )
+        password = ""
+        if fuente.startswith("Snowflake"):
+            password = st.text_input(
+                "Contraseña de Snowflake", type="password", key="admin_password",
+                help="No se guarda; solo se usa para esta actualización.",
+            )
+        if st.button("Entrenar / actualizar modelo", use_container_width=True, key="admin_entrenar"):
+            if fuente.startswith("Snowflake") and not password:
+                st.error("Ingresa la contraseña de Snowflake.")
+                return
+            if password:
+                os.environ["SNOWFLAKE_PASSWORD"] = password
+            with st.spinner("Entrenando modelo... puede tardar uno o dos minutos."):
+                try:
+                    summary = run_full_pipeline(
+                        backend="snowflake",
+                        use_snowflake_csv=fuente.startswith("Snowflake"),
+                    )
+                except Exception as exc:
+                    st.error(f"No se pudo entrenar: {exc}")
+                    return
+            load_model_bundle.clear()
+            ev = summary["evaluacion_prueba_reservada"]["modelo"]
+            st.success(
+                f"Modelo actualizado: {summary['modelo_seleccionado']} "
+                f"(AUROC {ev['auroc']:.3f})"
+            )
+            st.rerun()
+            
+def render_header():
+    logo = asset_uri("brand.svg", "image/svg+xml")
+    markup(f'''
+    <div id="inicio" class="section-anchor"></div>
+    <div class="utility-bar"><div class="utility-inner"><span>Investigación en salud · Universidad del Norte</span><span>Entorno académico &nbsp; / &nbsp; Datos sintéticos</span></div></div>
+    <header class="site-header">
+      <a class="brand" href="#inicio" target="_self" aria-label="OncoRisk, inicio"><img class="brand-mark" src="{logo}" alt=""/><span><span class="brand-name">Onco<span>Risk</span></span><span class="brand-tagline">INVESTIGACIÓN Y ANÁLISIS</span></span></a>
+      <nav class="nav-links" aria-label="Navegación principal"><a href="#inicio" target="_self">INICIO</a><a href="#proyecto" target="_self">EL PROYECTO</a><a href="#herramientas" target="_self">HERRAMIENTAS</a><a href="#modelo" target="_self">EL MODELO</a><a class="nav-cta" href="#explorar" target="_self">Iniciar exploración &nbsp; ↗</a></nav>
+    </header>''')
+
+
+def render_hero():
+    photo = asset_uri("equipo-investigacion.png", "image/png")
+    markup(f'''
+    <section class="hero" aria-labelledby="hero-title">
+      <div class="hero-content"><span class="hero-kicker">CONOCIMIENTO QUE CONECTA</span><h1 id="hero-title" class="hero-title">La investigación<br>empieza con<br><em>una nueva mirada.</em></h1><p class="hero-copy">Exploramos características asociadas al riesgo oncológico a través de los datos y el aprendizaje automático.</p><div class="hero-actions"><a class="button-link" href="#explorar" target="_self">Explorar el modelo &nbsp; →</a><a class="button-link secondary" href="#proyecto" target="_self">Conoce el proyecto</a></div><div class="hero-label">PROTOTIPO ACADÉMICO &nbsp; · &nbsp; DATOS SINTÉTICOS</div></div>
+      <div class="hero-picture"><img src="{photo}" alt="Ilustración generada con IA de un equipo de investigación en salud"/><span class="hero-stat">Datos que inspiran<br><strong>nuevas preguntas.</strong></span><small class="image-credit">Imagen ilustrativa generada con IA</small></div>
+    </section>''')
+
+
+def render_services():
+    cards = [
+        ("profile", "Exploración individual", "Configura las variables de un caso de ejemplo y consulta la estimación del modelo sintético.", "explorar", "Explorar variables"),
+        ("chart", "Resultados comprensibles", "Consulta la probabilidad estimada y conoce el alcance de cada resultado de la demostración.", "resultado", "Ver resultados"),
+        ("research", "Investigación transparente", "Revisa las variables del modelo y sus métricas de evaluación en la prueba sintética.", "modelo", "Conocer el modelo"),
+    ]
+    rendered = "".join(f'<article class="service-card"><span class="service-icon">{icon(i)}</span><h3>{title}</h3><p>{copy}</p><a href="#{anchor}" target="_self">{label} &nbsp; →</a></article>' for i, title, copy, anchor, label in cards)
+    markup(f'<section id="herramientas" class="content-width section-anchor"><div class="section-heading"><span class="eyebrow">UN ESPACIO PARA EXPLORAR</span><h2>La información, más cerca de ti</h2><p>Tres formas de acercarte al análisis y comprender cada paso.</p></div><div class="service-grid">{rendered}</div></section>')
+
+
+def render_project():
+    markup(f'''
+    <section id="proyecto" class="info-band section-anchor"><div class="content-width info-inner"><div class="info-copy"><span class="eyebrow">NUESTRO PROPÓSITO</span><h2>Transformar los datos<br>en conocimiento.</h2><p>OncoRisk es un proyecto académico de ingeniería de datos y aprendizaje automático. Integra preparación de datos, comparación de modelos y una interfaz para explorar sus resultados.</p><p>Esta demostración trabaja con información sintética y permite estudiar el comportamiento del modelo seleccionado.</p><a href="#metodologia" target="_self" class="text-link">Conoce cómo funciona &nbsp; →</a></div><div class="info-art"><div class="purpose-symbol">{icon("shield")}</div><h3>Una exploración responsable</h3><p>Los datos y el modelo son sintéticos. Las estimaciones son experimentales y no deben usarse para diagnóstico ni decisiones clínicas.</p><div class="purpose-tags"><span>Datos sintéticos</span><span>Validación interna</span><span>Uso académico</span></div></div></div></section>''')
 
 
 def patient_input_form() -> pd.DataFrame | None:
-    st.markdown('<div class="section-kicker">01 / Configuración</div>', unsafe_allow_html=True)
-    st.subheader("Variables de entrada")
-    st.markdown('<p class="section-note">Modifica los valores de ejemplo para explorar el comportamiento del modelo. Todos los campos son obligatorios.</p>', unsafe_allow_html=True)
     with st.form("formulario_paciente"):
         col1, col2, col3 = st.columns(3, gap="large")
         with col1:
@@ -100,7 +154,7 @@ def patient_input_form() -> pd.DataFrame | None:
             paridad = st.number_input("Paridad (número de embarazos)", min_value=0, max_value=10, value=1)
             ca125 = st.number_input("CA-125 (U/mL)", min_value=0.0, max_value=600.0, value=18.0, step=0.1)
             resultado_imagen = st.selectbox("Hallazgo de imagen", ["normal", "indeterminado", "sospechoso"])
-            st.caption("Las variables son ejemplos definidos para la demostración sintética.")
+            st.caption("Variables de ejemplo para la demostración sintética.")
         submitted = st.form_submit_button("Calcular estimación →", type="primary", use_container_width=True)
     if not submitted:
         return None
@@ -120,21 +174,35 @@ def patient_input_form() -> pd.DataFrame | None:
 def render_prediction(bundle: dict, patient_df: pd.DataFrame):
     pipeline = bundle["pipeline"]
     proba = float(pipeline.predict_proba(patient_df[bundle["feature_columns"]])[0, 1])
-    st.markdown('<div class="section-kicker">02 / Resultado</div>', unsafe_allow_html=True)
-    st.subheader("Estimación del modelo")
-    st.caption("El resultado corresponde a los valores enviados en el último cálculo. Para actualizarlo, vuelve a pulsar Calcular estimación.")
+    st.caption("Corresponde a los valores enviados en el último cálculo. Para actualizarlo, vuelve a pulsar Calcular estimación.")
     left, right = st.columns([1, 2], gap="large")
     with left:
         st.metric("Probabilidad estimada", f"{proba:.1%}")
         st.progress(min(max(proba, 0.0), 1.0))
     with right:
-        st.markdown('<div class="panel"><p><strong>¿Cómo leer este resultado?</strong><br>Es una probabilidad de clasificación de una condición simulada. No representa el riesgo futuro de una persona y no se han establecido umbrales clínicos para esta salida.</p></div>', unsafe_allow_html=True)
-        st.caption("Generada exclusivamente con el modelo entrenado sobre datos sintéticos.")
-    st.markdown('<div class="section-kicker">03 / Exploración</div>', unsafe_allow_html=True)
-    st.subheader("Comprende el modelo")
+        markup('<div class="panel result-card"><h3>¿Cómo leer este resultado?</h3><p>Es una probabilidad de clasificación de una condición simulada. No representa el riesgo futuro de una persona y no se han establecido umbrales clínicos para esta salida.</p></div>')
+    with st.expander("Consultar los valores utilizados en el cálculo"):
+        st.dataframe(patient_df, use_container_width=True, hide_index=True)
+
+
+def render_interpretation(bundle: dict):
+    name = html.escape(MODEL_NAMES.get(bundle["model_name"], bundle["model_name"]))
+    markup(f'<div class="model-note"><span class="eyebrow">MODELO SELECCIONADO</span><h3>{name}</h3><p>Seleccionado entre regresión logística, Random Forest y XGBoost mediante validación cruzada agrupada por paciente.</p></div>')
     with st.expander("Variables con mayor contribución global", expanded=False):
-        st.write("Estas variables describen el comportamiento general del modelo; no explican por sí solas este resultado individual ni indican causalidad.")
-        st.dataframe(explain_model(pipeline, top_n=10), use_container_width=True, hide_index=True)
+        st.write("Describen el comportamiento general del modelo. No explican por sí solas un resultado individual ni indican causalidad.")
+        explanation = explain_model(bundle["pipeline"], top_n=10)
+        value_column = explanation.columns[1]
+        st.vega_lite_chart(explanation, {
+            "mark": {"type": "bar", "cornerRadiusEnd": 4, "color": "#168eb5"},
+            "encoding": {
+                "y": {"field": "variable", "type": "nominal", "sort": None, "title": None},
+                "x": {"field": value_column, "type": "quantitative", "title": value_column},
+                "tooltip": [{"field": "variable", "type": "nominal"}, {"field": value_column, "type": "quantitative"}],
+            },
+            "height": 300,
+            "config": {"view": {"stroke": None}, "axis": {"labelColor": "#42586d", "titleColor": "#42586d"}},
+        }, use_container_width=True)
+        st.dataframe(explanation, use_container_width=True, hide_index=True)
     with st.expander("Ver desempeño en la prueba sintética", expanded=False):
         ev, ref = bundle["evaluation"]["modelo"], bundle["evaluation"]["modelo_nulo"]
         a, b, c, d = st.columns(4)
@@ -145,26 +213,49 @@ def render_prediction(bundle: dict, patient_df: pd.DataFrame):
         st.caption("Evaluación interna con datos sintéticos. Un Brier menor indica mejor desempeño probabilístico; no demuestra utilidad clínica.")
 
 
+def render_workflow():
+    steps = [("01", "Configura", "Ingresa las variables del caso sintético en el formulario."), ("02", "Explora", "Calcula la estimación y consulta los valores utilizados."), ("03", "Comprende", "Revisa las contribuciones globales y las métricas del modelo.")]
+    rendered = "".join(f'<article class="workflow-step"><span class="step-number">{n}</span><div><h3>{title}</h3><p>{copy}</p></div></article>' for n, title, copy in steps)
+    markup(f'<section id="metodologia" class="content-width section-anchor"><div class="section-heading"><span class="eyebrow">UN PROCESO CLARO</span><h2>Del dato a la exploración</h2><p>Acércate al modelo en tres pasos.</p></div><div class="workflow">{rendered}</div></section>')
+
+
+def render_footer():
+    logo = asset_uri("brand.svg", "image/svg+xml")
+    markup(f'''<footer class="site-footer"><div class="footer-grid content-width"><div class="footer-brand"><a class="brand" href="#inicio" target="_self"><img class="brand-mark" src="{logo}" alt=""/><span><span class="brand-name">Onco<span>Risk</span></span><span class="brand-tagline">INVESTIGACIÓN Y ANÁLISIS</span></span></a><p>Un espacio académico para explorar<br>los datos y hacer nuevas preguntas.</p></div><div class="footer-links"><h3>Explora</h3><a href="#proyecto" target="_self">El proyecto</a><a href="#explorar" target="_self">Variables de entrada</a><a href="#resultado" target="_self">Resultados</a></div><div class="footer-links"><h3>Conoce más</h3><a href="#modelo" target="_self">Interpretación del modelo</a><a href="#metodologia" target="_self">Cómo funciona</a><a href="#inicio" target="_self">Volver al inicio ↑</a></div><div class="footer-about"><h3>Proyecto académico</h3><p>Universidad del Norte</p><p>Datos sintéticos · Validación interna<br>Uso experimental</p></div></div><div class="footer-bottom">OncoRisk &nbsp; / &nbsp; Investigación y análisis oncológico &nbsp; / &nbsp; Prototipo académico</div></footer>''')
+
+
 def main():
-    st.markdown(STYLE, unsafe_allow_html=True)
+    markup(f"<style>{(APP_DIR / 'portal.css').read_text(encoding='utf-8')}</style>")
     bundle = load_model_bundle()
-    sidebar(bundle)
-    st.markdown('<div class="eyebrow">Investigación · Prototipo académico</div>', unsafe_allow_html=True)
-    st.title("Exploración de características oncológicas")
-    st.markdown('<p class="hero-copy">Una vista clara para explorar cómo un modelo de demostración procesa variables y presenta sus resultados.</p>', unsafe_allow_html=True)
-    st.markdown('<div class="notice"><strong>Uso académico y experimental.</strong> Los datos y el modelo son sintéticos. El resultado no es un diagnóstico y no debe utilizarse para tomar decisiones clínicas.</div>', unsafe_allow_html=True)
-    if bundle is None:
-        st.error("No se encontró un modelo entrenado. Ejecuta primero el pipeline sintético:")
-        st.code("python scripts/run_pipeline.py", language="bash")
-        st.stop()
-    patient_df = patient_input_form()
-    if patient_df is not None:
-        st.session_state["oncorisk_input"] = patient_df
-    if "oncorisk_input" in st.session_state:
-        render_prediction(bundle, st.session_state["oncorisk_input"])
-    else:
-        st.markdown('<div class="panel"><p><strong>Tu resultado aparecerá aquí.</strong><br>Completa el formulario y selecciona «Calcular estimación» para iniciar la demostración.</p></div>', unsafe_allow_html=True)
-    st.markdown('<div class="footer">ONCORISK &nbsp; / &nbsp; Proyecto académico · Universidad del Norte &nbsp; / &nbsp; Entorno de demostración</div>', unsafe_allow_html=True)
+    render_header()
+    render_hero()
+    render_services()
+    render_project()
+    with st.container(key="tool-section"):
+        markup('<div id="explorar" class="section-anchor"></div><div class="section-heading left"><span class="eyebrow">EXPLORACIÓN INDIVIDUAL</span><h2>Una mirada a las variables</h2><p>Modifica los valores de ejemplo para explorar el comportamiento del modelo. Todos los campos son obligatorios.</p></div>')
+        markup('<div class="notice"><strong>Uso académico y experimental.</strong> Los datos y el modelo son sintéticos. El resultado no es un diagnóstico ni debe utilizarse para tomar decisiones clínicas.</div>')
+        if bundle is None:
+            st.info("La interfaz está lista. Para habilitar las estimaciones, genera el modelo desde la carpeta del proyecto:")
+            st.code("python scripts/run_pipeline.py", language="bash")
+        else:
+            patient_df = patient_input_form()
+            if patient_df is not None:
+                st.session_state["oncorisk_input"] = patient_df
+    with st.container(key="results-section"):
+        markup('<div id="resultado" class="section-anchor"></div><div class="section-heading left"><span class="eyebrow">RESULTADOS</span><h2>Comprende tu exploración</h2><p>Consulta la estimación correspondiente al último caso calculado.</p></div>')
+        if bundle is not None and "oncorisk_input" in st.session_state:
+            render_prediction(bundle, st.session_state["oncorisk_input"])
+        else:
+            markup(f'<div class="empty-state"><span class="service-icon">{icon("chart")}</span><div><h3>Tu resultado aparecerá aquí</h3><p>Completa las variables y selecciona «Calcular estimación» para comenzar.</p><a href="#explorar" target="_self">Ir al formulario &nbsp; ↑</a></div></div>')
+    with st.container(key="interpretation-section"):
+        markup('<div id="modelo" class="section-anchor"></div><div class="section-heading left"><span class="eyebrow">INVESTIGACIÓN TRANSPARENTE</span><h2>Detrás de cada estimación</h2><p>Explora cómo se comporta el modelo en esta demostración.</p></div>')
+        if bundle is not None:
+            render_interpretation(bundle)
+        else:
+            st.caption("La interpretación y las métricas estarán disponibles después de generar el modelo.")
+    render_workflow()
+    render_admin_panel()
+    render_footer()
 
 
 if __name__ == "__main__":

@@ -1,0 +1,36 @@
+{
+  "context": {
+    "account": "OM39627",
+    "user": "dayanamargaritamolinavega",
+    "role": "ACCOUNTADMIN",
+    "warehouse": "ONCORISK_WH",
+    "database": "ONCORISK_DB",
+    "schema": "RAW"
+  },
+  "warehouses": [
+    {
+      "name": "COMPUTE_WH",
+      "state": "SUSPENDED",
+      "size": "X-Small",
+      "owner": "ACCOUNTADMIN"
+    },
+    {
+      "name": "ONCORISK_WH",
+      "state": "SUSPENDED",
+      "size": "X-Small",
+      "owner": "ACCOUNTADMIN"
+    },
+    {
+      "name": "SNOWFLAKE_LEARNING_WH",
+      "state": "SUSPENDED",
+      "size": "X-Small",
+      "owner": "ACCOUNTADMIN"
+    },
+    {
+      "name": "SYSTEM$STREAMLIT_NOTEBOOK_WH",
+      "state": "SUSPENDED",
+      "size": "X-Small",
+      "owner": "ACCOUNTADMIN"
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+.env
+.env.*
+!.env.snowflake.example
+*.pem
+*.p8
+__pycache__/
+.venv/
