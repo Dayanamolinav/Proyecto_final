@@ -39,6 +39,8 @@ def run_full_pipeline(
     use_snowflake_csv: bool = True,
     use_local_synthetic_csv: bool = False,
     transform_with_sql: bool = False,
+    uploaded_csv: str | Path | None = None,
+    uploaded_name: str | None = None,
 ) -> dict:
     """Ejecuta el flujo de punta a punta y devuelve un resumen con las
     rutas generadas y las métricas del modelo seleccionado.
@@ -52,7 +54,8 @@ def run_full_pipeline(
 
     # --- Fase: Ingesta -> RAW -------------------------------------------------
     df_source, ingest_meta = load_source_file(
-        csv_path, synth_cfg, use_snowflake_csv=use_snowflake_csv, use_local_synthetic_csv=use_local_synthetic_csv
+        csv_path, synth_cfg, use_snowflake_csv=use_snowflake_csv, use_local_synthetic_csv=use_local_synthetic_csv,
+        uploaded_csv=uploaded_csv, uploaded_name=uploaded_name,
     )
     persist_raw(df_source, filename="clinical_raw.parquet", backend=backend)
     raw_df = read_layer("raw", "clinical_raw.parquet", backend=backend)

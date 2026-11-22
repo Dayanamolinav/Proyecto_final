@@ -2,8 +2,10 @@
 from __future__ import annotations
 
 import html
+import io
 import os
 import sys
+import tempfile
 from pathlib import Path
 
 import joblib
@@ -15,7 +17,10 @@ from config import MODELS_DIR, TEST_SIZE  # noqa: E402
 from src.modeling.explain import explain_model  # noqa: E402
 from src.processing.input_validation import prepare_patient_input  # noqa: E402
 from src.pipeline import run_full_pipeline  # noqa: E402
+from src.data_layer.ingestion import read_uploaded_csv, validate_uploaded_frame  # noqa: E402
 from app.statistics_panel import render_statistics_panel, VARIABLE_LABELS, category  # noqa: E402
+from app.dashboard_cards import AXIS  # noqa: E402
+from app.detail_views import _table, record_table  # noqa: E402
 
 APP_DIR = Path(__file__).resolve().parent
 MODEL_PATH = MODELS_DIR / "modelo_seleccionado.joblib"
@@ -48,8 +53,8 @@ def load_model_bundle():
 
 # --------------------------------------------------------------------------- portada
 
-def render_header(solid: bool):
-    home = "?" if solid else ""
+def render_header(solid: bool, stats: bool = False):
+    home = "?" if (solid or stats) else ""
     section(f'''
     <header class="or-header{' solid' if solid else ''}" id="or-header">
       <a class="logo" href="{home}#inicio" target="_self">OncoRisk</a>
@@ -201,7 +206,7 @@ def render_motion_script():
   $$('.or-step').forEach(s => stepIo.observe(s));
 
   const head = $('#or-header'), hero = $('#or-hero-video'), par = $('#or-parallax'), wide = $('#or-wide');
-  const dark = $$('.or-hero, .or-wide, .or-close');
+  const dark = $$('.or-hero, .or-wide, .or-close, .or-stats-hero');
   const words = man ? $$('.w', man) : [];
   function tick() {
     const h = innerHeight;
@@ -266,7 +271,7 @@ def render_prediction(bundle: dict, patient_df: pd.DataFrame):
       <p class="or-note">Probabilidad de clasificación de una condición simulada. No es un diagnóstico ni un riesgo clínico validado.</p></div>''')
     st.caption("Corresponde a los valores enviados en el último cálculo.")
     with st.expander("Valores utilizados en el cálculo"):
-        st.dataframe(patient_df.rename(columns=VARIABLE_LABELS), width="stretch", hide_index=True)
+        st.html(record_table(patient_df.iloc[0], VARIABLE_LABELS))
 
 
 def render_explore(bundle: dict | None):
@@ -316,34 +321,86 @@ def render_interpretation(bundle: dict | None):
             explanation = explain_model(bundle["pipeline"], top_n=10)
             explanation["variable"] = explanation["variable"].map(readable_feature)
             value_column = explanation.columns[1]
-            st.vega_lite_chart(explanation, {
-                "mark": {"type": "bar", "color": "#2048ff"},
-                "encoding": {
-                    "y": {"field": "variable", "type": "nominal", "sort": None, "title": None},
-                    "x": {"field": value_column, "type": "quantitative", "title": value_column},
-                    "tooltip": [{"field": "variable", "type": "nominal"}, {"field": value_column, "type": "quantitative"}],
-                },
-                "height": 300,
-                "config": {"view": {"stroke": None}, "axis": {"labelColor": "#0d0f14", "titleColor": "#6d6f76"}},
-            }, width="stretch")
-            st.dataframe(explanation.rename(columns={"variable": "Variable", "coeficiente (log-odds)": "Coeficiente (log-momios)", "importancia_relativa": "Importancia relativa"}), width="stretch", hide_index=True)
+            values = [round(float(v), 3) for v in explanation[value_column]][::-1]
+            st.echarts_chart({"grid": {"left": 4, "right": 44, "top": 6, "bottom": 4, "containLabel": True}, "tooltip": {"trigger": "item"},
+                              "xAxis": {"type": "value", **AXIS},
+                              "yAxis": {"type": "category", "data": explanation["variable"].tolist()[::-1], **AXIS, "axisLabel": {"color": "#16231d", "fontSize": 12}, "splitLine": {"show": False}},
+                              "series": [{"type": "bar", "barWidth": "60%", "label": {"show": True, "position": "right", "formatter": "{c}", "fontSize": 11},
+                                          "data": [{"value": v, "itemStyle": {"color": "#ff8a5c" if v > 0 else "#1fb985",
+                                                                              "borderRadius": [0, 6, 6, 0] if v > 0 else [6, 0, 0, 6]}} for v in values]}]},
+                             height=320, alt="Contribución de las variables al modelo")
+            st.html('<p class="dk-note">Naranja aumenta la probabilidad estimada; verde la disminuye.</p>')
+            rows = [[html.escape(r.variable), f"<b>{num(float(getattr(r, '_2')), 3)}</b>", "↑ aumenta" if float(getattr(r, '_2')) > 0 else "↓ disminuye"]
+                    for r in explanation.itertuples()]
+            st.html('<div class="dv-card">' + _table(["Variable", "Coeficiente (log-momios)", "Efecto en la estimación"], rows, {1}) + "</div>")
         with st.expander("Desempeño en la prueba reservada"):
             ev, ref = bundle["evaluation"]["modelo"], bundle["evaluation"]["modelo_nulo"]
-            a, b, c, d = st.columns(4)
-            a.metric("AUROC", f"{ev['auroc']:.3f}")
-            b.metric("Precisión promedio", f"{ev['pr_auc']:.3f}")
-            c.metric("Brier del modelo", f"{ev['brier_score']:.3f}")
-            d.metric("Brier de referencia", f"{ref['brier_score']:.3f}")
-            e, f, g = st.columns(3)
-            e.metric("Sensibilidad", f"{ev['sensibilidad']:.3f}")
-            f.metric("Especificidad", f"{ev['especificidad']:.3f}")
-            g.metric("Umbral técnico", f"{bundle.get('threshold', 0.5):.2f}")
+            pct = lambda v: f"{float(v) * 100:.1f}".replace(".", ",") + " %"
+            rows = [["AUROC", f"<b>{num(ev['auroc'], 3)}</b>", "0,500"], ["PR-AUC (precisión promedio)", f"<b>{num(ev['pr_auc'], 3)}</b>", num(ref['pr_auc'], 3)],
+                    ["Brier", f"<b>{num(ev['brier_score'], 3)}</b>", num(ref['brier_score'], 3)], ["Sensibilidad", f"<b>{pct(ev['sensibilidad'])}</b>", "—"],
+                    ["Especificidad", f"<b>{pct(ev['especificidad'])}</b>", "—"], ["F1", f"<b>{num(ev['f1'], 3)}</b>", "—"],
+                    ["Umbral técnico", f"<b>{num(bundle.get('threshold', 0.5), 2)}</b>", "—"]]
+            st.html('<div class="dv-card">' + _table(["Métrica", "Modelo", "Modelo nulo"], rows, {1, 2}) + "</div>")
             st.caption("Evaluación interna con datos sintéticos. Un Brier menor indica mejor desempeño probabilístico; no demuestra utilidad clínica. "
                        "El umbral se eligió maximizando F1 con predicciones fuera de pliegue del conjunto de desarrollo; no es un punto de corte clínico.")
 
 
-def render_admin_panel():
-    with st.container(key="admin"), st.expander("Panel de administración: actualizar el modelo", icon=":material/settings:"):
+ORIGINS = {"snowflake_tabla_prueba": "Datos de Snowflake", "csv_sintetico_local": "CSV local", "csv_cargado": "CSV subido", "generador_sintetico_pruebas": "Lote generado"}
+
+
+def origin_label(value) -> str:
+    key = str(value or "").split(":")[0]
+    return ORIGINS.get(key, key.replace("_", " ") or "Sin registro")
+
+
+def render_model_status(bundle: dict | None):
+    """Estado del modelo en producción e historial de entrenamientos (registro de experimentos)."""
+    from datetime import datetime
+    from src.modeling.registry import read_experiments
+
+    if bundle is not None:
+        ev, null = bundle["evaluation"]["modelo"], bundle["evaluation"]["modelo_nulo"]
+        trained = datetime.fromtimestamp(MODEL_PATH.stat().st_mtime).strftime("%d/%m/%Y %H:%M")
+        origin = origin_label(bundle.get("data_origin"))
+        cells = [("Modelo", html.escape(MODEL_NAMES.get(bundle["model_name"], bundle["model_name"])), f"entrenado {trained}"),
+                 ("AUROC", num(ev["auroc"], 3), "prueba reservada"),
+                 ("Brier", num(ev["brier_score"], 3), f"nulo {num(null['brier_score'], 3)}"),
+                 ("Umbral", num(bundle.get("threshold", .5), 2), html.escape(origin))]
+        st.html('<div class="or-kpis">' + "".join(f'<div class="or-kpi"><span>{k}</span><b>{v}</b><small>{s}</small></div>' for k, v, s in cells) + "</div>")
+    runs = [r for r in read_experiments() if r.get("test_metrics")]
+    if runs:
+        history = pd.DataFrame([{"entrenamiento": i + 1, "fecha": r["timestamp_utc"][:16].replace("T", " "),
+                                 "Brier": r["test_metrics"].get("brier_score"), "AUROC": r["test_metrics"].get("auroc"),
+                                 "modelo": MODEL_NAMES.get(r["model_name"], r["model_name"]),
+                                 "origen": origin_label(r.get("origen_datos"))} for i, r in enumerate(runs)])
+        null_brier = float(bundle["evaluation"]["modelo_nulo"]["brier_score"]) if bundle else None
+        st.html('<div class="or-dash-h"><h3>Historial de entrenamientos</h3><p>Brier del modelo seleccionado en cada entrenamiento. La línea punteada es el modelo nulo: por debajo de ella, el modelo calibra mejor que asignar la prevalencia a todos.</p></div>')
+        layers = [{"mark": {"type": "line", "color": "#2048ff", "strokeWidth": 2.5, "point": {"filled": True, "size": 70, "color": "#2048ff"}},
+                   "encoding": {"x": {"field": "entrenamiento", "type": "ordinal", "title": "Entrenamiento", "axis": {"labelAngle": 0}},
+                                "y": {"field": "Brier", "type": "quantitative", "scale": {"zero": False}, "title": "Brier"},
+                                "tooltip": [{"field": "fecha", "title": "Fecha (UTC)"}, {"field": "modelo"}, {"field": "Brier", "type": "quantitative", "format": ".3f"},
+                                            {"field": "AUROC", "type": "quantitative", "format": ".3f"}, {"field": "origen", "title": "Origen de datos"}]}}]
+        if null_brier is not None:
+            layers.append({"mark": {"type": "rule", "color": "#ff5a1f", "strokeDash": [5, 4], "strokeWidth": 1.5}, "data": {"values": [{"y": null_brier}]},
+                           "encoding": {"y": {"field": "y", "type": "quantitative"}}})
+        series = [{"type": "line", "encode": {"x": "entrenamiento", "y": "Brier"}, "symbolSize": 9, "lineStyle": {"width": 3, "color": "#14946a"},
+                   "itemStyle": {"color": "#14946a", "borderColor": "#fff", "borderWidth": 2}}]
+        if null_brier is not None:
+            series[0]["markLine"] = {"silent": True, "symbol": "none", "lineStyle": {"color": "#ff8a5c", "type": "dashed"},
+                                     "data": [{"yAxis": round(null_brier, 4)}], "label": {"formatter": "modelo nulo", "color": "#7b8a83"}}
+        frame = history.assign(entrenamiento=history.entrenamiento.astype(str), Brier=history.Brier.astype(float).round(4))
+        st.echarts_chart({"grid": {"left": 4, "right": 70, "top": 16, "bottom": 4, "containLabel": True}, "tooltip": {"trigger": "axis"},
+                          "dataset": {"source": frame[["entrenamiento", "Brier"]]}, "xAxis": {"type": "category", **AXIS, "splitLine": {"show": False}},
+                          "yAxis": {"type": "value", "scale": True, **AXIS}, "series": series}, height=230, alt="Brier del modelo en cada entrenamiento")
+        with st.expander("Ver los entrenamientos registrados"):
+            rows = [[str(r.entrenamiento), html.escape(r.fecha), html.escape(r.modelo), f"<b>{num(r.Brier, 3)}</b>", num(r.AUROC, 3), html.escape(r.origen)]
+                    for r in history.iloc[::-1].itertuples()]
+            st.html('<div class="dv-card">' + _table(["#", "Fecha (UTC)", "Modelo", "Brier", "AUROC", "Origen"], rows, {0, 3, 4}) + "</div>")
+
+
+def render_admin_panel(bundle: dict | None = None):
+    with st.container(key="admin"), st.expander("Acceso administración", icon=":material/lock:"):
+        st.html('<div class="or-dash-h"><h3>Panel de administración</h3><p>Actualiza el modelo con datos nuevos y revisa su desempeño.</p></div>')
         codigo_esperado = os.getenv("ADMIN_PANEL_CODE", "")
         if not codigo_esperado:
             st.caption("No hay código configurado (ADMIN_PANEL_CODE en el archivo .env): este panel queda abierto.")
@@ -356,31 +413,75 @@ def render_admin_panel():
                     st.caption("Ingresa el código de administrador para desbloquear esta sección.")
                 return
 
-        st.caption("Vuelve a entrenar el modelo sin usar la terminal.")
-        fuente = st.radio("Fuente de datos", ["Snowflake (20.000 pacientes)", "Generar lote local pequeño"], index=0, key="admin_fuente")
+        if st.session_state.get("admin_resultado"):
+            st.success(st.session_state["admin_resultado"])
+        render_model_status(bundle)
+        st.html('<div class="or-dash-h" style="margin-top:22px"><h3>Reentrenar el modelo</h3><p>Ejecuta el pipeline completo sin usar la terminal. El modelo nuevo reemplaza al actual y queda en el historial.</p></div>')
+        fuente = st.radio("Fuente de datos", ["Snowflake", "Generar lote local pequeño"], index=0, key="admin_fuente")
         password = ""
         uses_token = os.getenv("SNOWFLAKE_AUTHENTICATOR", "PROGRAMMATIC_ACCESS_TOKEN").strip().upper() == "PROGRAMMATIC_ACCESS_TOKEN"
         secret_label = "Token PAT de Snowflake" if uses_token else "Contraseña de Snowflake"
         if fuente.startswith("Snowflake"):
             password = st.text_input(secret_label, type="password", key="admin_password",
                                      help="No se guarda; solo se usa para esta actualización.")
+        archivo, problemas = None, []
+        if True:
+            archivo = st.file_uploader("Subir o cambiar CSV (opcional)", type="csv", key="admin_csv",
+                                       help="En Snowflake reemplaza la tabla de entrada al entrenar; sin archivo se usa la tabla actual. En local, sin archivo se genera un lote pequeño.")
+            st.caption("El CSV debe tener las mismas columnas del lote sintético: id_paciente, edad, sexo, "
+                       "antecedente_familiar_cancer, antecedente_personal_benigno, tabaquismo, imc, presion_sistolica, "
+                       "glucosa_mg_dl, paridad, ca125_u_ml, resultado_imagen, fuente, periodo y riesgo_oncologico (0/1). "
+                       "Los identificadores directos (nombre, documento) no se guardan.")
+            if archivo is not None:
+                try:
+                    cargado = read_uploaded_csv(io.BytesIO(archivo.getvalue()))
+                    problemas = validate_uploaded_frame(cargado)
+                except Exception as exc:
+                    problemas = [f"No se pudo leer el archivo: {exc}"]
+                if problemas:
+                    st.error(" ".join(problemas))
+                else:
+                    st.success(f"{archivo.name}: {len(cargado):,} registros listos para entrenar.")
+        confirmar = True
+        if fuente.startswith("Snowflake") and archivo is not None:
+            confirmar = st.checkbox("Confirmo reemplazar los datos de entrada de Snowflake con este CSV", key="admin_confirmar_csv")
         if st.button("Entrenar / actualizar modelo", width="stretch", key="admin_entrenar"):
             if fuente.startswith("Snowflake") and not password:
                 st.error(f"Ingresa el {secret_label[0].lower() + secret_label[1:]}.")
+                return
+            if not confirmar:
+                st.error("Confirma el reemplazo de la tabla de Snowflake.")
+                return
+            if problemas:
+                st.error("Corrige el archivo CSV antes de entrenar.")
                 return
             if password:
                 # Con autenticación PAT el conector lee SNOWFLAKE_TOKEN, no SNOWFLAKE_PASSWORD.
                 os.environ["SNOWFLAKE_TOKEN" if uses_token else "SNOWFLAKE_PASSWORD"] = password
             with st.spinner("Entrenando modelo... puede tardar uno o dos minutos."):
+                tmp_path = None
                 try:
                     usa_snowflake = fuente.startswith("Snowflake")
-                    summary = run_full_pipeline(backend="snowflake" if usa_snowflake else "local", use_snowflake_csv=usa_snowflake)
+                    extra = {}
+                    if archivo is not None:
+                        with tempfile.NamedTemporaryFile(suffix=".csv", delete=False) as tmp:
+                            tmp.write(archivo.getvalue())
+                            tmp_path = tmp.name
+                        if usa_snowflake:
+                            from src.data_layer.upload_snowflake import replace_uploaded_csv
+                            replace_uploaded_csv(tmp_path)
+                            st.session_state["admin_resultado"] = "CSV actualizado en Snowflake. Entrenamiento pendiente de finalizar."
+                        extra = {"uploaded_csv": tmp_path, "uploaded_name": archivo.name}
+                    summary = run_full_pipeline(backend="snowflake" if usa_snowflake else "local", use_snowflake_csv=usa_snowflake, **extra)
                 except Exception as exc:
                     st.error(f"No se pudo entrenar: {exc}")
                     return
+                finally:
+                    if tmp_path:
+                        os.unlink(tmp_path)
             load_model_bundle.clear()
             ev = summary["evaluacion_prueba_reservada"]["modelo"]
-            st.success(f"Modelo actualizado: {summary['modelo_seleccionado']} (AUROC {ev['auroc']:.3f})")
+            st.session_state["admin_resultado"] = f"Modelo actualizado: {summary['modelo_seleccionado']} (AUROC {ev['auroc']:.3f})"
             st.rerun()
 
 
@@ -388,8 +489,7 @@ def main():
     st.html(APP_DIR / "portal.css")
     bundle = load_model_bundle()
     if st.query_params.get("vista") == "estadisticas":
-        render_header(solid=True)
-        st.html('<div class="or-spacer"></div>')
+        render_header(solid=True, stats=True)
         render_statistics_panel(bundle)
         render_footer()
         render_motion_script()
@@ -403,8 +503,8 @@ def main():
     render_explore(bundle)
     render_interpretation(bundle)
     render_close()
-    render_admin_panel()
     render_footer()
+    render_admin_panel(bundle)
     render_motion_script()
 
 
