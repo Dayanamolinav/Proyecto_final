@@ -13,6 +13,8 @@ from src.analytics.data import load_patient_data
 from src.analytics import statistics as stats
 from src.analytics.model_diagnostics import recover_holdout, diagnostic_results
 from config import ANALYTICAL_DIR
+from app.dashboard_cards import render_dashboard
+from app.detail_views import VIEWS, view_cohort, view_distributions, view_factors, view_model, view_quality
 
 NUMERIC = ["edad", "imc", "presion_sistolica", "glucosa_mg_dl", "paridad", "ca125_u_ml"]
 LABELS = {
@@ -61,8 +63,10 @@ RESULT_LABELS = {
 }
 GROUPS = ["sexo", "grupo_etario", "imc_categoria", "tabaquismo", "resultado_imagen",
           "antecedente_familiar_cancer", "antecedente_personal_benigno", "fuente"]
-COLORS = ["#168eb5", "#de8a50", "#54b5a6", "#8c80bd", "#d3b445", "#55758f"]
-CONFIG = {"view": {"stroke": None}, "axis": {"labelColor": "#4b687a", "titleColor": "#4b687a", "gridColor": "#eaf0f4"}, "legend": {"labelColor": "#4b687a", "titleColor": "#294f66"}}
+COLORS = ["#14946a", "#ff8a5c", "#b5dd4a", "#5b8def", "#e3a008", "#7b8a83"]
+CONFIG = {"view": {"stroke": None}, "font": "Instrument Sans", "background": "transparent",
+          "axis": {"labelColor": "#6d6f76", "titleColor": "#6d6f76", "gridColor": "#e6ede9", "domainColor": "#c9c6bf", "tickColor": "#c9c6bf", "labelFontSize": 11, "titleFontWeight": 500},
+          "legend": {"labelColor": "#0d0f14", "titleColor": "#6d6f76", "orient": "top"}, "bar": {"cornerRadiusEnd": 6}}
 
 
 def label(column: str) -> str:
@@ -132,7 +136,7 @@ def bar_frequency(data: pd.DataFrame, column: str, title: str):
     st.markdown(f"#### {title}")
     frequency = stats.frequency_table(data, column).copy()
     frequency["categoria"] = frequency["categoria"].map(lambda x: category(x, column))
-    show_chart(frequency, {"mark": {"type": "bar", "cornerRadiusEnd": 4, "color": COLORS[0]}, "encoding": {
+    show_chart(frequency, {"mark": {"type": "bar", "color": COLORS[0]}, "encoding": {
         "y": {"field": "categoria", "type": "nominal", "title": None, "sort": "-x", "axis": {"labelLimit": 200}},
         "x": {"field": "n", "type": "quantitative", "title": "Pacientes", "scale": {"zero": True}},
         "tooltip": [{"field": "categoria", "type": "nominal", "title": label(column)},
@@ -177,7 +181,8 @@ def apply_filters(source: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
     for key, value in defaults.items():
         if key not in st.session_state:
             st.session_state[key] = value
-    with st.container(border=True):
+    with st.container(key="stats_filters"):
+        st.html('<div class="or-filters-h"><h3>Filtrar la cohorte</h3><p>Los filtros aplican al resumen y a todas las vistas de pacientes.</p></div>')
         first, second, third = st.columns([2, 1, 1])
         with first:
             if age_range[0] < age_range[1]:
@@ -202,7 +207,8 @@ def apply_filters(source: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
     context = {"edad_min": selected_age[0], "edad_max": selected_age[1], "sexo": selected_sex,
                "etiquetas": [int(x) for x in selected_target], "fuentes": selected_source, "semestres": selected_period,
                "filas": len(filtered), "pacientes_unicos": int(filtered.id_paciente.nunique())}
-    st.caption(f"Cohorte seleccionada: {len(filtered):,} de {len(source):,} registros. Los filtros aplican a todas las vistas de pacientes; Evaluación del modelo identifica por separado su prueba reservada original.".replace(",", "."))
+    share = len(filtered) / len(source) if len(source) else 0
+    st.html(f'<div class="or-cohort"><b>{len(filtered):,}</b> de {len(source):,} pacientes seleccionados<span class="or-cohort-bar"><i style="width:{share * 100:.1f}%"></i></span><small>La vista «Evaluación del modelo» usa por separado su prueba reservada original.</small></div>'.replace(",", "."))
     return filtered, context
 
 
@@ -216,9 +222,9 @@ def overview(data: pd.DataFrame):
     completeness = 100 * (1 - data[source_columns].isna().sum().sum() / (len(data) * len(source_columns)))
     a, b, c, d = st.columns(4)
     a.metric("Pacientes en la selección", f"{data.id_paciente.nunique():,}".replace(",", "."))
-    b.metric("Etiqueta 1", f"{proportion:.2%}" if denominator else "Sin dato")
-    c.metric("Edad promedio", f"{data.edad.mean():.1f} años")
-    d.metric("Completitud de celdas", f"{completeness:.2f}%")
+    b.metric("Etiqueta 1", _pct(proportion, 2) if denominator else "Sin dato")
+    c.metric("Edad promedio", f"{data.edad.mean():.1f}".replace(".", ",") + " años")
+    d.metric("Completitud de celdas", f"{completeness:.2f}".replace(".", ",") + " %")
     st.caption(f"Etiqueta 1: {positives:,} / {denominator:,} etiquetas válidas · IC del 95% de Wilson: {low:.2%}–{high:.2%}. El identificador es ficticio y la etiqueta es simulada.")
     left, right = st.columns(2)
     with left:
@@ -230,7 +236,7 @@ def overview(data: pd.DataFrame):
     st.markdown("#### Sexo y grupos de edad")
     demographic = data.groupby(["grupo_etario", "sexo"], observed=True).size().rename("pacientes").reset_index()
     demographic["sexo"] = demographic.sexo.map(lambda value: category(value, "sexo"))
-    show_chart(demographic, {"mark": {"type": "bar", "cornerRadiusEnd": 3}, "encoding": {
+    show_chart(demographic, {"mark": {"type": "bar", }, "encoding": {
         "x": {"field": "grupo_etario", "type": "ordinal", "sort": ["<40", "40-54", "55-69", "70+"], "axis": {"labelAngle": 0}},
         "xOffset": {"field": "sexo"}, "y": {"field": "pacientes", "type": "quantitative"},
         "color": {"field": "sexo", "type": "nominal", "scale": {"range": COLORS[:2]}},
@@ -413,7 +419,7 @@ def periods(data: pd.DataFrame):
     st.info("Cada paciente tiene un único registro. Los semestres representan grupos de procedencia: estas gráficas comparan cohortes de distintos periodos y no reconstruyen la evolución individual.")
     counts = data.groupby("periodo", observed=True).size().sort_index().rename("pacientes").reset_index()
     st.markdown("#### Volumen registrado por semestre")
-    show_chart(counts, {"mark": {"type": "bar", "color": COLORS[0], "cornerRadiusEnd": 4}, "encoding": {
+    show_chart(counts, {"mark": {"type": "bar", "color": COLORS[0]}, "encoding": {
         "x": {"field": "periodo", "type": "ordinal", "sort": counts.periodo.tolist(), "title": "Semestre de procedencia", "axis": {"labelAngle": 0}},
         "y": {"field": "pacientes", "type": "quantitative", "title": "Pacientes", "scale": {"zero": True}},
         "tooltip": [{"field": "periodo", "type": "ordinal", "title": "Semestre"}, {"field": "pacientes", "type": "quantitative"}]}})
@@ -451,6 +457,13 @@ def cached_model_diagnostics(_bundle, model_name: str, model_fingerprint: str, t
     del model_name, model_fingerprint
     holdout = recover_holdout(_bundle, ANALYTICAL_DIR / "clinical_analytical.parquet")
     return diagnostic_results(holdout, threshold=threshold), holdout
+
+
+def _model_diagnostics(bundle, threshold: float) -> dict:
+    import hashlib
+    import pickle
+    fingerprint = hashlib.sha256(pickle.dumps(bundle) + (ANALYTICAL_DIR / "clinical_analytical.parquet").read_bytes()).hexdigest()
+    return cached_model_diagnostics(bundle, bundle["model_name"], fingerprint, threshold)
 
 
 def model_evaluation(bundle):
@@ -551,7 +564,7 @@ def multivariate(data: pd.DataFrame):
     else:
         cluster_summary = clusters["summary"].copy()
         cluster_summary["grupo"] = "Grupo " + cluster_summary.cluster.astype(str)
-        show_chart(cluster_summary, {"mark": {"type": "bar", "color": COLORS[0], "cornerRadiusEnd": 4}, "encoding": {
+        show_chart(cluster_summary, {"mark": {"type": "bar", "color": COLORS[0]}, "encoding": {
             "x": {"field": "grupo", "type": "nominal", "title": "Grupo exploratorio", "axis": {"labelAngle": 0}},
             "y": {"field": "n", "type": "quantitative", "title": "Pacientes"},
             "tooltip": [{"field": "grupo", "type": "nominal"}, {"field": "n", "type": "quantitative"}, {"field": "etiqueta1_pct", "type": "quantitative", "title": "Etiqueta 1 (%)", "format": ".2f"}]}})
@@ -630,14 +643,108 @@ def quality_and_data(data: pd.DataFrame, context: dict, metadata: dict):
         """)
 
 
+def _pct(value: float, decimals: int = 1) -> str:
+    return f"{value * 100:.{decimals}f}".replace(".", ",") + " %"
+
+
+def dashboard_summary(data: pd.DataFrame, bundle) -> None:
+    """Resumen de una sola pantalla: cifras clave, tendencia, modelo y desglose."""
+    valid = data.riesgo_oncologico.isin([0, 1])
+    positives = data.loc[valid, "riesgo_oncologico"]
+    prevalence = float(positives.mean()) if len(positives) else float("nan")
+    suspicious = float((data.resultado_imagen == "sospechoso").mean())
+    family = float((data.antecedente_familiar_cancer == 1).mean())
+    kpis = [
+        ("Pacientes", f"{data.id_paciente.nunique():,}".replace(",", "."), "en la selección actual"),
+        ("Etiqueta 1", _pct(prevalence), f"{int(positives.sum()):,}".replace(",", ".") + " pacientes"),
+        ("Edad promedio", f"{data.edad.mean():.1f}".replace(".", ",") + " años", f"mediana {data.edad.median():.0f}"),
+        ("Imagen sospechosa", _pct(suspicious), f"antecedente familiar {_pct(family, 0)}"),
+    ]
+    cells = "".join(f'<div class="or-kpi"><span>{k}</span><b>{v}</b><small>{s}</small></div>' for k, v, s in kpis)
+    st.html(f'<div class="or-kpis">{cells}</div>')
+
+    left, right = st.columns([2.1, 1], gap="large")
+    with left:
+        st.html('<div class="or-dash-h"><h3>Etiqueta por semestre</h3><p>Pacientes con etiqueta 1 en cada semestre de procedencia.</p></div>')
+        mode = st.segmented_control("Tipo de gráfico", ["Puntos", "Línea"], default="Puntos", key="stats_trend_mode", label_visibility="collapsed")
+        trend = (data.loc[valid].groupby("periodo")["riesgo_oncologico"].agg(positivos="sum", pacientes="size").reset_index())
+        trend["prevalencia"] = trend.positivos / trend.pacientes
+        if mode == "Línea":
+            show_chart(trend, {"layer": [
+                {"mark": {"type": "area", "color": COLORS[0], "opacity": .12, "interpolate": "monotone"}},
+                {"mark": {"type": "line", "color": COLORS[0], "strokeWidth": 2.5, "interpolate": "monotone", "point": {"filled": True, "size": 60, "color": COLORS[0]}}}],
+                "encoding": {"x": {"field": "periodo", "type": "ordinal", "axis": {"labelAngle": 0}},
+                             "y": {"field": "prevalencia", "type": "quantitative", "axis": {"format": ".0%"}, "scale": {"zero": False}},
+                             "tooltip": [{"field": "periodo"}, {"field": "prevalencia", "type": "quantitative", "format": ".2%"}, {"field": "positivos", "type": "quantitative"}]}}, height=260)
+        else:
+            unit = max(1, int(np.ceil(trend.positivos.max() / 24))) if len(trend) else 1
+            dots = pd.DataFrame([{"periodo": r.periodo, "nivel": i, "positivos": int(r.positivos)}
+                                 for r in trend.itertuples() for i in range(int(round(r.positivos / unit)))])
+            show_chart(dots, {"mark": {"type": "square", "size": 150, "color": COLORS[1], "opacity": .9},
+                              "encoding": {"x": {"field": "periodo", "type": "ordinal", "axis": {"labelAngle": 0}, "scale": {"paddingInner": .55}},
+                                           "y": {"field": "nivel", "type": "ordinal", "sort": "descending", "axis": None, "title": None},
+                                           "tooltip": [{"field": "periodo"}, {"field": "positivos", "type": "quantitative", "title": "Pacientes con etiqueta 1"}]}}, height=260)
+            st.caption(f"Cada cuadro representa unos {unit} pacientes con etiqueta 1.")
+    with right:
+        st.html('<div class="or-dash-h"><h3>Modelo seleccionado</h3><p>Discriminación en la prueba reservada.</p></div>')
+        if bundle is None:
+            st.caption("El modelo aún no se ha generado.")
+        else:
+            ev, null = bundle["evaluation"]["modelo"], bundle["evaluation"]["modelo_nulo"]
+            auroc = float(ev["auroc"])
+            gauge = pd.DataFrame({"parte": ["AUROC", "resto"], "valor": [auroc, 1 - auroc]})
+            st.vega_lite_chart(gauge, {"height": 210, "config": CONFIG, "layer": [
+                {"mark": {"type": "arc", "innerRadius": 72, "outerRadius": 92, "cornerRadius": 0},
+                 "encoding": {"theta": {"field": "valor", "type": "quantitative", "stack": True},
+                              "color": {"field": "parte", "type": "nominal", "scale": {"domain": ["AUROC", "resto"], "range": [COLORS[0], "#e4e1da"]}, "legend": None},
+                              "order": {"field": "parte", "sort": "ascending"}}},
+                {"mark": {"type": "text", "fontSize": 38, "fontWeight": 800, "font": "Archivo", "color": "#0d0f14"},
+                 "data": {"values": [{"t": f"{auroc:.3f}".replace(".", ",")}]}, "encoding": {"text": {"field": "t"}}}]},
+                width="stretch")
+            dec = lambda v, n: f"{float(v):.{n}f}".replace(".", ",")
+            st.html(f'''<dl class="or-mini-dl"><dt>Brier</dt><dd>{dec(ev["brier_score"], 3)} <small>nulo {dec(null["brier_score"], 3)}</small></dd>
+                <dt>Sensibilidad</dt><dd>{_pct(ev["sensibilidad"], 0)}</dd><dt>Especificidad</dt><dd>{_pct(ev["especificidad"], 0)}</dd>
+                <dt>Umbral</dt><dd>{dec(bundle.get("threshold", .5), 2)}</dd></dl>''')
+
+    left, right = st.columns([2.1, 1], gap="large")
+    with left:
+        order = [("sospechoso", "Sospechoso", COLORS[1]), ("indeterminado", "Indeterminado", "#e3a008"), ("normal", "Normal", COLORS[2])]
+        counts = data.resultado_imagen.value_counts()
+        total = int(counts.sum()) or 1
+        rates = data.loc[valid].groupby("resultado_imagen")["riesgo_oncologico"].mean()
+        bar = "".join(f'<i style="width:{counts.get(k, 0) / total * 100:.2f}%;background:{c}"></i>' for k, _, c in order)
+        miles = lambda v: f"{int(v):,}".replace(",", ".")
+        rows = "".join(f'<li><span class="sw" style="background:{c}"></span>{name}<b>{_pct(counts.get(k, 0) / total)}</b>'
+                       f'<em>{miles(counts.get(k, 0))} pacientes · etiqueta 1 en {_pct(rates.get(k, float("nan")))}</em></li>'
+                       for k, name, c in order)
+        st.html(f'<div class="or-dash-h"><h3>Hallazgo de imagen</h3><p>Composición de la selección y proporción con etiqueta 1 en cada grupo.</p></div>'
+                f'<div class="or-stack">{bar}</div><ul class="or-legend">{rows}</ul>')
+    with right:
+        st.html('<div class="or-dash-h"><h3>Etiqueta 1 por edad</h3><p>Proporción en cada grupo de edad.</p></div>')
+        by_age = data.loc[valid].groupby("grupo_etario", observed=True)["riesgo_oncologico"].mean().rename("prevalencia").reset_index()
+        show_chart(by_age, {"mark": {"type": "bar", "color": COLORS[0], "width": {"band": .55}},
+                            "encoding": {"x": {"field": "grupo_etario", "type": "ordinal", "sort": ["<40", "40-54", "55-69", "70+"], "axis": {"labelAngle": 0}},
+                                         "y": {"field": "prevalencia", "type": "quantitative", "axis": {"format": ".0%"}},
+                                         "tooltip": [{"field": "grupo_etario"}, {"field": "prevalencia", "type": "quantitative", "format": ".1%"}]}}, height=190)
+
+
 def render_statistics_panel(bundle=None):
     """Renderiza el panel completo sin modificar la inferencia individual existente."""
+    try:
+        source, metadata = load_patient_data()
+    except (OSError, ValueError) as exc:
+        source, metadata, load_error = pd.DataFrame(), {}, exc
+    else:
+        load_error = None
+    periods_text = " a ".join([min(metadata.get("periods") or ["—"]), max(metadata.get("periods") or ["—"])])
+    checksum = str(metadata.get("sha256", metadata.get("hash", "")))
+    st.html(f'''<div class="dk-top"><div><span class="dk-eyebrow">Análisis de la cohorte</span>
+      <h1>Análisis estadístico e inferencial</h1>
+      <p>{f"{len(source):,}".replace(",", ".")} pacientes ficticios · semestres {periods_text}</p></div>
+      <div class="dk-meta"><span><b>Fuente</b>{metadata.get("file_name", "Sin fuente")}</span><span><b>Huella SHA-256</b><code>{checksum[:16]}…</code></span></div></div>''')
     with st.container(key="statistics-section"):
-        st.markdown('<div class="statistics-heading"><span class="eyebrow">ANÁLISIS DE LA COHORTE</span><h1>Análisis estadístico e inferencial</h1><p>Demografía, distribuciones clínicas, asociaciones, estimaciones y evaluación del modelo.</p></div>', unsafe_allow_html=True)
-        try:
-            source, metadata = load_patient_data()
-        except (OSError, ValueError) as exc:
-            st.error(f"No se pudo cargar la base del panel: {exc}")
+        if load_error is not None:
+            st.error(f"No se pudo cargar la base del panel: {load_error}")
             return
         if source.empty:
             st.info("La fuente está vacía. No hay datos que analizar.")
@@ -647,32 +754,24 @@ def render_statistics_panel(bundle=None):
             source["grupo_etario"] = pd.cut(source.edad, [0, 40, 55, 70, 121], right=False, labels=["<40", "40–54", "55–69", "70+"])
         if "imc_categoria" not in source:
             source["imc_categoria"] = pd.cut(source.imc, [0, 18.5, 25, 30, 101], right=False, labels=["Bajo peso", "Normal", "Sobrepeso", "Obesidad"])
-        st.caption(f"Fuente local: {metadata.get('file_name', 'pacientes_sinteticos_20000.csv')} · {len(source):,} registros · datos completamente sintéticos. El panel no consulta Snowflake ni reentrena el modelo individual.")
-        with st.expander("Ver procedencia de esta base"):
-            st.write("CSV sintético incluido en el proyecto. Una fila por paciente ficticio; semestres de procedencia 2023-S1 a 2024-S2. Las etiquetas no tienen fecha índice ni horizonte de seguimiento.")
-            checksum = metadata.get("sha256", metadata.get("hash"))
-            if checksum:
-                st.code(f"SHA-256: {checksum}", language=None)
         data, context = apply_filters(source)
         if data.empty:
             st.info("No hay pacientes que cumplan todos los filtros. Selecciona al menos una opción en cada filtro o pulsa Restablecer filtros.")
             st.download_button("Descargar selección vacía", frame_csv(data), "pacientes_seleccion.csv", "text/csv", key="stats_download_empty")
             return
-        summary = stats.numeric_summary(data)
-        selected_view = st.segmented_control("Vista de análisis", ["Demografía", "Distribuciones", "Correlaciones", "Contrastes y OR", "Evolución por semestre", "Multivariante", "Evaluación del modelo", "Calidad y datos"], default="Demografía", key="stats_active_view", selection_mode="single")
-        if selected_view == "Demografía":
-            overview(data)
-        elif selected_view == "Distribuciones":
-            distributions(data, summary)
-        elif selected_view == "Correlaciones":
-            relationships(data)
-        elif selected_view == "Contrastes y OR":
-            comparisons(data)
-        elif selected_view == "Evolución por semestre":
-            periods(data)
-        elif selected_view == "Multivariante":
-            multivariate(data)
-        elif selected_view == "Evaluación del modelo":
-            model_evaluation(bundle)
-        elif selected_view == "Calidad y datos":
-            quality_and_data(data, context, metadata)
+        with st.container(key="stats_dashboard"):
+            render_dashboard(data, bundle)
+        st.html('<div class="dk-sep"><h2>Análisis detallado</h2><p>Cinco vistas: los datos, sus distribuciones, los factores asociados, el modelo y la calidad.</p></div>')
+        selected_view = st.segmented_control("Vista de análisis", VIEWS, default=VIEWS[0], key="stats_active_view",
+                                             selection_mode="single", label_visibility="collapsed", bind="query-params")
+        with st.container(key="stats_detail"):
+            if selected_view == "Cohorte":
+                view_cohort(data)
+            elif selected_view == "Distribuciones":
+                view_distributions(data)
+            elif selected_view == "Factores asociados":
+                view_factors(data)
+            elif selected_view == "Modelo":
+                view_model(bundle, _model_diagnostics, source)
+            elif selected_view == "Calidad de datos":
+                view_quality(data, stats.quality_report(data), context, metadata)
