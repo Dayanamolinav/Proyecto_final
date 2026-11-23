@@ -1,18 +1,22 @@
 """Portal académico OncoRisk. Portada editorial con videos y modelo sintético."""
 from __future__ import annotations
 
+import hmac
 import html
 import io
 import os
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 import joblib
 import pandas as pd
 import streamlit as st
+from dotenv import load_dotenv
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+load_dotenv(Path(__file__).resolve().parents[1] / ".env")  # ADMIN_PANEL_CODE y credenciales, sin importar desde dónde se lance
 from config import MODELS_DIR, TEST_SIZE  # noqa: E402
 from src.modeling.explain import explain_model  # noqa: E402
 from src.processing.input_validation import prepare_patient_input  # noqa: E402
@@ -398,20 +402,50 @@ def render_model_status(bundle: dict | None):
             st.html('<div class="dv-card">' + _table(["#", "Fecha (UTC)", "Modelo", "Brier", "AUROC", "Origen"], rows, {0, 3, 4}) + "</div>")
 
 
+ADMIN_MAX_INTENTOS = 5
+ADMIN_BLOQUEO_SEG = 300
+
+
+def admin_desbloqueado() -> bool:
+    """Pide el código de ADMIN_PANEL_CODE. Sin código configurado el panel queda cerrado (nunca abierto)."""
+    esperado = os.getenv("ADMIN_PANEL_CODE", "").strip()
+    if not esperado:
+        st.warning("El panel está bloqueado: no hay código de administrador configurado. "
+                   "Define ADMIN_PANEL_CODE en el archivo .env y reinicia la página.")
+        return False
+    if st.session_state.get("admin_ok"):
+        if st.button("Cerrar sesión de administrador", key="admin_logout"):
+            st.session_state["admin_ok"] = False
+            st.rerun()
+        return True
+    hasta = st.session_state.get("admin_bloqueado_hasta", 0.0)
+    if time.time() < hasta:
+        st.error(f"Demasiados intentos. Espera {int(hasta - time.time()) + 1} s para volver a intentar.")
+        return False
+    ingresado = st.text_input("Código de administrador", type="password", key="admin_code_input")
+    if not ingresado:
+        st.caption("Ingresa el código de administrador para desbloquear esta sección.")
+        return False
+    if hmac.compare_digest(ingresado.encode(), esperado.encode()):
+        st.session_state["admin_ok"] = True
+        st.session_state["admin_fallos"] = 0
+        st.rerun()
+    fallos = st.session_state.get("admin_fallos", 0) + 1
+    st.session_state["admin_fallos"] = fallos
+    if fallos >= ADMIN_MAX_INTENTOS:
+        st.session_state["admin_bloqueado_hasta"] = time.time() + ADMIN_BLOQUEO_SEG
+        st.session_state["admin_fallos"] = 0
+        st.error("Demasiados intentos. El acceso se bloqueó por 5 minutos.")
+    else:
+        st.error("Código incorrecto.")
+    return False
+
+
 def render_admin_panel(bundle: dict | None = None):
     with st.container(key="admin"), st.expander("Acceso administración", icon=":material/lock:"):
         st.html('<div class="or-dash-h"><h3>Panel de administración</h3><p>Actualiza el modelo con datos nuevos y revisa su desempeño.</p></div>')
-        codigo_esperado = os.getenv("ADMIN_PANEL_CODE", "")
-        if not codigo_esperado:
-            st.caption("No hay código configurado (ADMIN_PANEL_CODE en el archivo .env): este panel queda abierto.")
-        else:
-            ingresado = st.text_input("Código de administrador", type="password", key="admin_code_input")
-            if ingresado != codigo_esperado:
-                if ingresado:
-                    st.error("Código incorrecto.")
-                else:
-                    st.caption("Ingresa el código de administrador para desbloquear esta sección.")
-                return
+        if not admin_desbloqueado():
+            return
 
         if st.session_state.get("admin_resultado"):
             st.success(st.session_state["admin_resultado"])

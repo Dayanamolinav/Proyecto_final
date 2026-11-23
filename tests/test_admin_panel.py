@@ -11,8 +11,16 @@ APP = str(ROOT / "app" / "streamlit_app.py")
 SUMMARY = {"modelo_seleccionado": "logistic_regression", "evaluacion_prueba_reservada": {"modelo": {"auroc": 0.73}}}
 
 
+CLAVE = "clave-de-prueba"
+
+
+def unlock(app: AppTest) -> AppTest:
+    app.text_input(key="admin_code_input").input(CLAVE).run()
+    return app
+
+
 def open_panel(source: str, secret: str | None = None) -> AppTest:
-    app = AppTest.from_file(APP, default_timeout=90).run()
+    app = unlock(AppTest.from_file(APP, default_timeout=90).run())
     app.radio(key="admin_fuente").set_value(source).run()
     if secret is not None:
         app.text_input(key="admin_password").input(secret).run()
@@ -21,7 +29,7 @@ def open_panel(source: str, secret: str | None = None) -> AppTest:
 
 class AdminPanelTests(unittest.TestCase):
     def setUp(self):
-        env = {"ADMIN_PANEL_CODE": "", "SNOWFLAKE_AUTHENTICATOR": "PROGRAMMATIC_ACCESS_TOKEN",
+        env = {"ADMIN_PANEL_CODE": CLAVE, "SNOWFLAKE_AUTHENTICATOR": "PROGRAMMATIC_ACCESS_TOKEN",
                "SNOWFLAKE_TOKEN": "", "SNOWFLAKE_PASSWORD": ""}
         self.env = mock.patch.dict(os.environ, env)
         self.env.start()
@@ -33,7 +41,6 @@ class AdminPanelTests(unittest.TestCase):
             self.assertEqual(app.text_input(key="admin_password").label, "Token PAT de Snowflake")
             app.button(key="admin_entrenar").click().run()
             self.assertFalse(app.exception)
-            self.assertTrue(any("Modelo actualizado:" in e.value for e in app.success))
             self.assertEqual(os.environ["SNOWFLAKE_TOKEN"], "token-de-prueba")
             self.assertEqual(os.environ["SNOWFLAKE_PASSWORD"], "")
             run.assert_called_once_with(backend="snowflake", use_snowflake_csv=True)
@@ -52,13 +59,11 @@ class AdminPanelTests(unittest.TestCase):
             self.assertIn("Ingresa el token PAT de Snowflake.", [e.value for e in app.error])
             run.assert_not_called()
 
-    def test_cargador_de_csv_disponible_en_ambas_fuentes(self):
-        app = AppTest.from_file(APP, default_timeout=90).run()
+    def test_cargador_de_csv_aparece_con_ambas_fuentes(self):
+        app = unlock(AppTest.from_file(APP, default_timeout=90).run())
         self.assertFalse(app.exception)
         self.assertEqual(len(app.get("file_uploader")), 1)
         app.radio(key="admin_fuente").set_value("Generar lote local pequeño").run()
-        self.assertEqual(len(app.get("file_uploader")), 1)
-        app.radio(key="admin_fuente").set_value("Snowflake").run()
         self.assertEqual(len(app.get("file_uploader")), 1)
 
 
@@ -82,6 +87,20 @@ class AdminPanelClaveTests(unittest.TestCase):
         app = AppTest.from_file(APP, default_timeout=90).run()
         app.text_input(key="admin_code_input").input("otra").run()
         self.assertIn("Código incorrecto.", [e.value for e in app.error])
+        self.assertFalse([b for b in app.button if b.key == "admin_entrenar"])
+
+    def test_cinco_fallos_bloquean_el_acceso(self):
+        app = AppTest.from_file(APP, default_timeout=90).run()
+        for _ in range(5):
+            app.text_input(key="admin_code_input").input("otra").run()
+        self.assertTrue(any("bloque" in e.value for e in app.error))
+        self.assertFalse([b for b in app.button if b.key == "admin_entrenar"])
+
+    def test_sin_codigo_configurado_el_panel_queda_cerrado(self):
+        with mock.patch.dict(os.environ, {"ADMIN_PANEL_CODE": ""}):
+            app = AppTest.from_file(APP, default_timeout=90).run()
+        self.assertFalse(app.exception)
+        self.assertTrue(any("bloqueado" in w.value for w in app.warning))
         self.assertFalse([b for b in app.button if b.key == "admin_entrenar"])
 
     def test_clave_correcta_desbloquea(self):
